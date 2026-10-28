@@ -6,11 +6,7 @@ const initialKpis = {
   fullySubmitted: 0,
   partiallySubmitted: 0,
   notSubmitted: 0,
-  averageSubmission: 0,
-  expectedSubjects: 0,
-  submittedSubjects: 0,
-  pendingSubjects: 0,
-  fullySubmittedRate: 0
+  averageSubmission: 0
 };
 
 const styles = {
@@ -92,7 +88,12 @@ const styles = {
     overflowWrap: 'anywhere'
   },
   tableWrap: { width: '100%', overflowX: 'auto' },
-  table: { width: '100%', borderCollapse: 'collapse', fontSize: '11px', whiteSpace: 'nowrap' },
+  table: {
+    width: '100%',
+    borderCollapse: 'collapse',
+    fontSize: '11px',
+    whiteSpace: 'nowrap'
+  },
   th: {
     padding: '9px 10px',
     background: '#f1f5f9',
@@ -101,7 +102,11 @@ const styles = {
     fontWeight: 700,
     color: '#334155'
   },
-  td: { padding: '8px 10px', borderBottom: '1px solid #edf0f4', textAlign: 'left' },
+  td: {
+    padding: '8px 10px',
+    borderBottom: '1px solid #edf0f4',
+    textAlign: 'left'
+  },
   muted: { fontSize: '11px', color: '#64748b', lineHeight: 1.5 },
   error: {
     background: '#fff1f2',
@@ -116,17 +121,38 @@ const styles = {
 
 function number(value) {
   const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed.toLocaleString('en-IN') : '0';
+  return value !== null && value !== undefined && value !== '' &&
+    Number.isFinite(parsed)
+    ? parsed.toLocaleString('en-IN')
+    : '0';
 }
 
 function percent(value) {
   const parsed = Number(value);
-  return Number.isFinite(parsed) ? `${parsed.toFixed(1)}%` : '0.0%';
+  return value !== null && value !== undefined && value !== '' &&
+    Number.isFinite(parsed)
+    ? `${parsed.toFixed(1)}%`
+    : '0.0%';
 }
 
+function textValue(value) {
+  return value === null || value === undefined || String(value).trim() === ''
+    ? '—'
+    : String(value);
+}
+
+/*
+ * IMPORTANT FIX:
+ * Text columns such as Sales Type must not be passed to Number().
+ * Set type: 'text' for columns containing words.
+ */
 function SummaryTable({ rows, firstColumn, columns }) {
   if (!rows || rows.length === 0) {
-    return <p style={styles.muted}>No data available for the selected filters.</p>;
+    return (
+      <p style={styles.muted}>
+        No data available for the selected filters.
+      </p>
+    );
   }
 
   return (
@@ -136,21 +162,38 @@ function SummaryTable({ rows, firstColumn, columns }) {
           <tr>
             <th style={styles.th}>{firstColumn}</th>
             {columns.map(column => (
-              <th key={column.key} style={styles.th}>{column.label}</th>
+              <th key={column.key} style={styles.th}>
+                {column.label}
+              </th>
             ))}
           </tr>
         </thead>
         <tbody>
           {rows.map((row, index) => (
-            <tr key={`${row.name || row.mentor || 'row'}-${index}`}>
-              <td style={styles.td}>{row.name || row.mentor || '—'}</td>
-              {columns.map(column => (
-                <td key={column.key} style={styles.td}>
-                  {column.format
-                    ? column.format(row[column.key])
-                    : number(row[column.key])}
-                </td>
-              ))}
+            <tr key={`${row.name || row.mentor || row.salesType || 'row'}-${index}`}>
+              <td style={styles.td}>
+                {textValue(row.name || row.mentor || row.salesType)}
+              </td>
+
+              {columns.map(column => {
+                const value = row[column.key];
+
+                let displayedValue;
+
+                if (column.format) {
+                  displayedValue = column.format(value, row);
+                } else if (column.type === 'text') {
+                  displayedValue = textValue(value);
+                } else {
+                  displayedValue = number(value);
+                }
+
+                return (
+                  <td key={column.key} style={styles.td}>
+                    {displayedValue}
+                  </td>
+                );
+              })}
             </tr>
           ))}
         </tbody>
@@ -159,10 +202,56 @@ function SummaryTable({ rows, firstColumn, columns }) {
   );
 }
 
+/*
+ * The Apps Script currently returns one row for each Mentor + Program.
+ * Convert those rows into the two-program layout used by the dashboard.
+ */
+function prepareMentorProgramSummary(rows) {
+  const grouped = {};
+
+  (rows || []).forEach(row => {
+    const mentor = row.mentor || 'Unassigned';
+
+    if (!grouped[mentor]) {
+      grouped[mentor] = [];
+    }
+
+    grouped[mentor].push(row);
+  });
+
+  return Object.keys(grouped)
+    .sort((a, b) => a.localeCompare(b))
+    .map(mentor => {
+      const programs = grouped[mentor].slice().sort((a, b) =>
+        String(a.program || '').localeCompare(String(b.program || ''))
+      );
+
+      const first = programs[0] || {};
+      const second = programs[1] || {};
+
+      return {
+        mentor,
+        program1: first.program || '',
+        full1: first.fullySubmitted || 0,
+        partial1: first.partiallySubmitted || 0,
+        nil1: first.notSubmitted || 0,
+        program2: second.program || '',
+        full2: second.fullySubmitted || 0,
+        partial2: second.partiallySubmitted || 0,
+        nil2: second.notSubmitted || 0
+      };
+    });
+}
+
 function downloadCsv(rows) {
   if (!rows || rows.length === 0) return;
 
-  const headers = ['Roll No.', 'Program', 'Mentor', 'Pending Subjects'];
+  const headers = [
+    'Roll No.',
+    'Program',
+    'Mentor',
+    'Pending Subjects'
+  ];
 
   const csvCell = value =>
     `"${String(value == null ? '' : value).replace(/"/g, '""')}"`;
@@ -184,12 +273,14 @@ function downloadCsv(rows) {
 
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
+
   link.href = url;
   link.download = 'IA_Pending_Subjects.csv';
   document.body.appendChild(link);
   link.click();
   link.remove();
-  URL.revokeObjectURL(url);
+
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 export default function Dashboard() {
@@ -204,25 +295,64 @@ export default function Dashboard() {
     setLoading(true);
     setError('');
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
+
     try {
       const params = new URLSearchParams();
+
       if (program) params.set('program', program);
       if (salesType) params.set('salesType', salesType);
       if (mentor) params.set('mentor', mentor);
 
-      const query = params.toString();
-      const response = await fetch(`/api/dashboard${query ? `?${query}` : ''}`);
-      const json = await response.json();
+      // Avoid reusing a stale browser/API response.
+      params.set('_refresh', String(Date.now()));
+
+      const response = await fetch(
+        `/api/dashboard?${params.toString()}`,
+        {
+          method: 'GET',
+          cache: 'no-store',
+          signal: controller.signal,
+          headers: { Accept: 'application/json' }
+        }
+      );
+
+      const responseText = await response.text();
+
+      let json;
+
+      try {
+        json = JSON.parse(responseText);
+      } catch {
+        throw new Error(
+          `The dashboard API returned a non-JSON response (HTTP ${response.status}).`
+        );
+      }
 
       if (!response.ok || json.error) {
-        throw new Error(json.error || `Request failed: ${response.status}`);
+        throw new Error(
+          json.error || `Request failed with HTTP ${response.status}.`
+        );
+      }
+
+      if (!json.kpis || !json.filters) {
+        throw new Error(
+          'The API response is missing dashboard data. Please check the Apps Script deployment.'
+        );
       }
 
       setData(json);
     } catch (err) {
-      setError(err.message || 'Unable to load dashboard data.');
-      setData(null);
+      if (err.name === 'AbortError') {
+        setError(
+          'The dashboard request took longer than 60 seconds. Please retry. If this continues, the API response may be too slow or too large.'
+        );
+      } else {
+        setError(err.message || 'Unable to load dashboard data.');
+      }
     } finally {
+      clearTimeout(timeoutId);
       setLoading(false);
     }
   }, [program, salesType, mentor]);
@@ -233,14 +363,32 @@ export default function Dashboard() {
 
   const kpis = data?.kpis || initialKpis;
   const pendingLearners = data?.pendingLearners || [];
-  const mentorProgramSummary = data?.mentorProgramSummary || [];
   const mentorSalesSummary = data?.mentorSalesSummary || [];
 
-  const resetFilters = () => {
+  const mentorProgramSummary = prepareMentorProgramSummary(
+    data?.mentorProgramSummary || []
+  );
+
+  const totalLearners = Number(kpis.totalLearners || 0);
+  const fullCount = Number(
+    kpis.fullySubmitted ?? kpis.full ?? 0
+  );
+  const partialCount = Number(
+    kpis.partiallySubmitted ?? kpis.partial ?? 0
+  );
+  const nilCount = Number(
+    kpis.notSubmitted ?? kpis.nil ?? 0
+  );
+
+  const fullRate = totalLearners
+    ? (fullCount / totalLearners) * 100
+    : 0;
+
+  function resetFilters() {
     setProgram('');
     setSalesType('');
     setMentor('');
-  };
+  }
 
   return (
     <main style={styles.page}>
@@ -256,13 +404,20 @@ export default function Dashboard() {
           <div style={styles.error}>
             <strong>Unable to load dashboard:</strong> {error}
             <div style={{ marginTop: '9px' }}>
-              <button style={styles.button} onClick={load}>Retry</button>
+              <button
+                style={styles.button}
+                onClick={load}
+                disabled={loading}
+              >
+                Retry
+              </button>
             </div>
           </div>
         )}
 
         <section style={styles.panel}>
           <h2 style={styles.sectionTitle}>Filters</h2>
+
           <div
             style={{
               display: 'grid',
@@ -273,68 +428,92 @@ export default function Dashboard() {
           >
             <div>
               <label style={styles.label}>Program</label>
-              <select style={styles.select} value={program}
-                onChange={event => setProgram(event.target.value)}>
+              <select
+                style={styles.select}
+                value={program}
+                onChange={event => setProgram(event.target.value)}
+              >
                 <option value="">All Programs</option>
-                {(data?.filters?.programs || []).map(item =>
+                {(data?.filters?.programs || []).map(item => (
                   <option key={item} value={item}>{item}</option>
-                )}
+                ))}
               </select>
             </div>
 
             <div>
               <label style={styles.label}>Sales Type</label>
-              <select style={styles.select} value={salesType}
-                onChange={event => setSalesType(event.target.value)}>
+              <select
+                style={styles.select}
+                value={salesType}
+                onChange={event => setSalesType(event.target.value)}
+              >
                 <option value="">All Sales Types</option>
-                {(data?.filters?.salesTypes || []).map(item =>
+                {(data?.filters?.salesTypes || []).map(item => (
                   <option key={item} value={item}>{item}</option>
-                )}
+                ))}
               </select>
             </div>
 
             <div>
               <label style={styles.label}>Mentor</label>
-              <select style={styles.select} value={mentor}
-                onChange={event => setMentor(event.target.value)}>
+              <select
+                style={styles.select}
+                value={mentor}
+                onChange={event => setMentor(event.target.value)}
+              >
                 <option value="">All Mentors</option>
-                {(data?.filters?.mentors || []).map(item =>
+                {(data?.filters?.mentors || []).map(item => (
                   <option key={item} value={item}>{item}</option>
-                )}
+                ))}
               </select>
             </div>
 
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <button style={styles.button} onClick={resetFilters}>Clear Filters</button>
-              <button style={styles.button} onClick={load} disabled={loading}>
+              <button
+                style={styles.button}
+                onClick={resetFilters}
+                disabled={loading}
+              >
+                Clear Filters
+              </button>
+              <button
+                style={styles.button}
+                onClick={load}
+                disabled={loading}
+              >
                 {loading ? 'Refreshing…' : 'Refresh Data'}
               </button>
             </div>
           </div>
-          {loading && <p style={{ ...styles.muted, marginTop: '10px' }}>Loading dashboard data…</p>}
+
+          {loading && (
+            <p style={{ ...styles.muted, marginTop: '10px' }}>
+              Loading dashboard data…
+            </p>
+          )}
         </section>
 
         <section style={styles.grid}>
           {[
             ['Total Learners', number(kpis.totalLearners)],
-            ['Fully Submitted', number(kpis.fullySubmitted)],
-            ['Partial Submission', number(kpis.partiallySubmitted)],
-            ['Nil Submission', number(kpis.notSubmitted)],
-            ['Average Submission', percent(kpis.averageSubmission)],
-            ['Full Submission Rate', percent(kpis.fullySubmittedRate)],
-            ['Expected Subjects', number(kpis.expectedSubjects)],
-            ['Submitted Subjects', number(kpis.submittedSubjects)],
-            ['Pending Subject Count', number(kpis.pendingSubjects)]
+            ['Fully Submitted', number(kpis.fullySubmitted ?? kpis.full)],
+            ['Partial Submission', number(kpis.partiallySubmitted ?? kpis.partial)],
+            ['Nil Submission', number(kpis.notSubmitted ?? kpis.nil)],
+            ['Average Submission', percent(kpis.averageSubmission ?? kpis.avgSubmission)],
+            ['Full Submission Rate', percent(fullRate)]
           ].map(([label, value]) => (
             <div key={label} style={styles.kpi}>
               <div style={styles.kpiLabel}>{label}</div>
-              <div style={styles.kpiValue}>{loading ? '—' : value}</div>
+              <div style={styles.kpiValue}>
+                {loading ? '—' : value}
+              </div>
             </div>
           ))}
         </section>
 
         <section style={styles.panel}>
           <h2 style={styles.sectionTitle}>Submission Status</h2>
+
           <div style={{ display: 'grid', gap: '12px' }}>
             {(data?.statusSummary || []).map(item => {
               const total = Number(kpis.totalLearners || 0);
@@ -344,23 +523,37 @@ export default function Dashboard() {
 
               return (
                 <div key={item.status}>
-                  <div style={{
-                    display: 'flex', justifyContent: 'space-between',
-                    marginBottom: '5px', fontSize: '11px'
-                  }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      marginBottom: '5px',
+                      fontSize: '11px'
+                    }}
+                  >
                     <span>{item.status}</span>
                     <strong>{number(item.count)}</strong>
                   </div>
-                  <div style={{
-                    height: '8px', background: '#e2e8f0',
-                    borderRadius: '5px', overflow: 'hidden'
-                  }}>
-                    <div style={{
-                      width: `${width}%`, height: '100%',
-                      background: item.status === 'Full'
-                        ? '#16a34a'
-                        : item.status === 'Partial' ? '#d97706' : '#64748b'
-                    }} />
+
+                  <div
+                    style={{
+                      height: '8px',
+                      background: '#e2e8f0',
+                      borderRadius: '5px',
+                      overflow: 'hidden'
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: `${width}%`,
+                        height: '100%',
+                        background: item.status === 'Full'
+                          ? '#16a34a'
+                          : item.status === 'Partial'
+                            ? '#d97706'
+                            : '#64748b'
+                      }}
+                    />
                   </div>
                 </div>
               );
@@ -371,10 +564,13 @@ export default function Dashboard() {
         <section style={styles.panel}>
           <h2 style={styles.sectionTitle}>Mentor-wise Program Summary</h2>
           <p style={styles.muted}>
-            The first two alphabetically sorted programs per mentor are shown side by side.
+            Shows the first two programs alphabetically for each mentor.
           </p>
+
           {mentorProgramSummary.length === 0 ? (
-            <p style={styles.muted}>No data available for the selected filters.</p>
+            <p style={styles.muted}>
+              No data available for the selected filters.
+            </p>
           ) : (
             <div style={styles.tableWrap}>
               <table style={styles.table}>
@@ -399,11 +595,11 @@ export default function Dashboard() {
                   {mentorProgramSummary.map((row, index) => (
                     <tr key={`${row.mentor}-${index}`}>
                       <td style={styles.td}>{row.mentor}</td>
-                      <td style={styles.td}>{row.program1 || '—'}</td>
+                      <td style={styles.td}>{textValue(row.program1)}</td>
                       <td style={styles.td}>{number(row.full1)}</td>
                       <td style={styles.td}>{number(row.partial1)}</td>
                       <td style={styles.td}>{number(row.nil1)}</td>
-                      <td style={styles.td}>{row.program2 || '—'}</td>
+                      <td style={styles.td}>{textValue(row.program2)}</td>
                       <td style={styles.td}>{number(row.full2)}</td>
                       <td style={styles.td}>{number(row.partial2)}</td>
                       <td style={styles.td}>{number(row.nil2)}</td>
@@ -419,13 +615,13 @@ export default function Dashboard() {
           <h2 style={styles.sectionTitle}>Mentor-wise Sales Type Summary</h2>
           <p style={styles.muted}>
             One row per mentor and sales type. Program is not included in this table.
-            Counts recalculate when you change the filters.
           </p>
+
           <SummaryTable
             rows={mentorSalesSummary}
             firstColumn="Mentor"
             columns={[
-              { key: 'salesType', label: 'Sales Type' },
+              { key: 'salesType', label: 'Sales Type', type: 'text' },
               { key: 'totalLearners', label: 'Total Learners' },
               { key: 'fullySubmitted', label: 'Full' },
               { key: 'partiallySubmitted', label: 'Partial' },
@@ -435,10 +631,15 @@ export default function Dashboard() {
         </section>
 
         <section style={styles.panel}>
-          <div style={{
-            display: 'flex', justifyContent: 'space-between',
-            alignItems: 'center', gap: '12px', flexWrap: 'wrap'
-          }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: '12px',
+              flexWrap: 'wrap'
+            }}
+          >
             <div>
               <h2 style={{ ...styles.sectionTitle, marginBottom: '5px' }}>
                 Partial Submission — Pending Subjects
@@ -447,63 +648,77 @@ export default function Dashboard() {
                 {number(pendingLearners.length)} partially submitted learners match the filters.
               </p>
             </div>
+
             <button
               style={{
                 ...styles.primaryButton,
-                opacity: pendingLearners.length ? 1 : 0.55
+                opacity: pendingLearners.length && !loading ? 1 : 0.55
               }}
-              disabled={pendingLearners.length === 0}
+              disabled={pendingLearners.length === 0 || loading}
               onClick={() => downloadCsv(pendingLearners)}
             >
               Download Pending Subjects (CSV)
             </button>
           </div>
+
           <p style={styles.muted}>
             The CSV includes only Roll No., Program, Mentor, and Pending Subjects.
-            Names and email addresses are excluded.
+            Learner names and email addresses are excluded.
           </p>
         </section>
 
         <section style={styles.panel}>
           <h2 style={styles.sectionTitle}>Program-wise Summary</h2>
-          <SummaryTable rows={data?.programSummary || []} firstColumn="Program"
+
+          <SummaryTable
+            rows={data?.programSummary || []}
+            firstColumn="Program"
             columns={[
               { key: 'totalLearners', label: 'Total Learners' },
               { key: 'fullySubmitted', label: 'Full' },
               { key: 'partiallySubmitted', label: 'Partial' },
-              { key: 'notSubmitted', label: 'Nil' },
-              { key: 'averageSubmission', label: 'Avg. Submission', format: percent }
+              { key: 'notSubmitted', label: 'Nil' }
             ]}
           />
         </section>
 
         <section style={styles.panel}>
           <h2 style={styles.sectionTitle}>Sales Type Summary</h2>
-          <SummaryTable rows={data?.salesSummary || []} firstColumn="Sales Type"
+
+          <SummaryTable
+            rows={data?.salesSummary || []}
+            firstColumn="Sales Type"
             columns={[
               { key: 'totalLearners', label: 'Total Learners' },
               { key: 'fullySubmitted', label: 'Full' },
               { key: 'partiallySubmitted', label: 'Partial' },
-              { key: 'notSubmitted', label: 'Nil' },
-              { key: 'averageSubmission', label: 'Avg. Submission', format: percent }
+              { key: 'notSubmitted', label: 'Nil' }
             ]}
           />
         </section>
 
         <section style={styles.panel}>
           <h2 style={styles.sectionTitle}>Mentor-wise Summary</h2>
-          <SummaryTable rows={data?.mentorSummary || []} firstColumn="Mentor"
+
+          <SummaryTable
+            rows={data?.mentorSummary || []}
+            firstColumn="Mentor"
             columns={[
               { key: 'totalLearners', label: 'Total Learners' },
               { key: 'fullySubmitted', label: 'Full' },
               { key: 'partiallySubmitted', label: 'Partial' },
-              { key: 'notSubmitted', label: 'Nil' },
-              { key: 'averageSubmission', label: 'Avg. Submission', format: percent }
+              { key: 'notSubmitted', label: 'Nil' }
             ]}
           />
         </section>
 
-        <footer style={{ ...styles.muted, textAlign: 'center', padding: '5px' }}>
+        <footer
+          style={{
+            ...styles.muted,
+            textAlign: 'center',
+            padding: '5px'
+          }}
+        >
           IA Submission Dashboard
         </footer>
       </div>
