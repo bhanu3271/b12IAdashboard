@@ -45,7 +45,7 @@ export default async function handler(req, res) {
 
     return res.status(502).json({
       error:
-        'Could not load dashboard data. Check the Apps Script deployment and its access settings.'
+        'Could not load dashboard data. Check the Apps Script deployment and access settings.'
     });
   }
 }
