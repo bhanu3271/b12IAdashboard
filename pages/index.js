@@ -159,7 +159,11 @@ function percent(value) {
 
 function SummaryTable({ rows, firstColumn, columns }) {
   if (!rows || rows.length === 0) {
-    return <p style={styles.muted}>No data available for the selected filters.</p>;
+    return (
+      <p style={styles.muted}>
+        No data available for the selected filters.
+      </p>
+    );
   }
 
   return (
@@ -178,7 +182,9 @@ function SummaryTable({ rows, firstColumn, columns }) {
         <tbody>
           {rows.map((row, index) => (
             <tr key={`${row.name || row.mentor || 'row'}-${index}`}>
-              <td style={styles.td}>{row.name || row.mentor || '—'}</td>
+              <td style={styles.td}>
+                {row.name || row.mentor || '—'}
+              </td>
               {columns.map(column => (
                 <td key={column.key} style={styles.td}>
                   {column.format
@@ -197,7 +203,7 @@ function SummaryTable({ rows, firstColumn, columns }) {
 function downloadCsv(rows) {
   if (!rows || rows.length === 0) return;
 
-  // These are the only columns included in the downloaded file.
+  // Only these four columns are exported.
   const headers = [
     'Roll No.',
     'Program',
@@ -206,8 +212,8 @@ function downloadCsv(rows) {
   ];
 
   const csvCell = value => {
-    const safeValue = String(value == null ? '' : value);
-    return `"${safeValue.replace(/"/g, '""')}"`;
+    const text = String(value == null ? '' : value);
+    return `"${text.replace(/"/g, '""')}"`;
   };
 
   const lines = [
@@ -220,7 +226,6 @@ function downloadCsv(rows) {
     ].map(csvCell).join(','))
   ];
 
-  // UTF-8 BOM helps Excel display text correctly.
   const blob = new Blob(
     ['\uFEFF' + lines.join('\r\n')],
     { type: 'text/csv;charset=utf-8;' }
@@ -264,7 +269,9 @@ export default function Dashboard() {
       const json = await response.json();
 
       if (!response.ok || json.error) {
-        throw new Error(json.error || `Request failed: ${response.status}`);
+        throw new Error(
+          json.error || `Request failed: ${response.status}`
+        );
       }
 
       setData(json);
@@ -283,6 +290,8 @@ export default function Dashboard() {
   const kpis = data?.kpis || initialKpis;
   const pendingLearners = data?.pendingLearners || [];
   const mentorProgramSummary = data?.mentorProgramSummary || [];
+  const mentorProgramSalesSummary =
+    data?.mentorProgramSalesSummary || [];
 
   const resetFilters = () => {
     setProgram('');
@@ -368,7 +377,11 @@ export default function Dashboard() {
               <button style={styles.button} onClick={resetFilters}>
                 Clear Filters
               </button>
-              <button style={styles.button} onClick={load} disabled={loading}>
+              <button
+                style={styles.button}
+                onClick={load}
+                disabled={loading}
+              >
                 {loading ? 'Refreshing…' : 'Refresh Data'}
               </button>
             </div>
@@ -395,13 +408,16 @@ export default function Dashboard() {
           ].map(([label, value]) => (
             <div key={label} style={styles.kpi}>
               <div style={styles.kpiLabel}>{label}</div>
-              <div style={styles.kpiValue}>{loading ? '—' : value}</div>
+              <div style={styles.kpiValue}>
+                {loading ? '—' : value}
+              </div>
             </div>
           ))}
         </section>
 
         <section style={styles.panel}>
           <h2 style={styles.sectionTitle}>Submission Status</h2>
+
           <div style={{ display: 'grid', gap: '12px' }}>
             {(data?.statusSummary || []).map(item => {
               const total = Number(kpis.totalLearners || 0);
@@ -423,6 +439,7 @@ export default function Dashboard() {
                     <span>{item.status}</span>
                     <strong>{number(item.count)}</strong>
                   </div>
+
                   <div
                     style={{
                       height: '8px',
@@ -451,9 +468,12 @@ export default function Dashboard() {
         </section>
 
         <section style={styles.panel}>
-          <h2 style={styles.sectionTitle}>Mentor-wise Program Summary</h2>
+          <h2 style={styles.sectionTitle}>
+            Mentor-wise Program Summary
+          </h2>
+
           <p style={styles.muted}>
-            Each mentor's first two alphabetically sorted programs are shown
+            The first two alphabetically sorted programs per mentor are shown
             side by side. Counts update with the selected filters.
           </p>
 
@@ -500,6 +520,30 @@ export default function Dashboard() {
         </section>
 
         <section style={styles.panel}>
+          <h2 style={styles.sectionTitle}>
+            Mentor-wise Program &amp; Sales Type Summary
+          </h2>
+
+          <p style={styles.muted}>
+            One row per unique mentor, program, and sales type combination.
+            This table follows all selected filters.
+          </p>
+
+          <SummaryTable
+            rows={mentorProgramSalesSummary}
+            firstColumn="Mentor"
+            columns={[
+              { key: 'program', label: 'Program' },
+              { key: 'salesType', label: 'Sales Type' },
+              { key: 'totalLearners', label: 'Total Learners' },
+              { key: 'fullySubmitted', label: 'Full' },
+              { key: 'partiallySubmitted', label: 'Partial' },
+              { key: 'notSubmitted', label: 'Nil' }
+            ]}
+          />
+        </section>
+
+        <section style={styles.panel}>
           <div
             style={{
               display: 'flex',
@@ -534,7 +578,7 @@ export default function Dashboard() {
           </div>
 
           <p style={styles.muted}>
-            The download contains only Roll No., Program, Mentor, and Pending
+            The CSV contains only Roll No., Program, Mentor, and Pending
             Subjects. Learner names and email addresses are excluded.
           </p>
         </section>
