@@ -1,209 +1,249 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
+const initialKpis = {
+  totalLearners: 0,
+  fullySubmitted: 0,
+  partiallySubmitted: 0,
+  notSubmitted: 0,
+  averageSubmission: 0,
+  expectedSubjects: 0,
+  submittedSubjects: 0,
+  pendingSubjects: 0,
+  fullySubmittedRate: 0
+};
+
 const styles = {
   page: {
     minHeight: '100vh',
     background: '#f5f7fb',
-    color: '#172033',
-    padding: '28px',
+    padding: '22px',
+    color: '#1f2937',
     fontFamily: 'Arial, Helvetica, sans-serif',
+    fontSize: '12px'
   },
   container: {
-    maxWidth: '1400px',
-    margin: '0 auto',
+    maxWidth: '1500px',
+    margin: '0 auto'
   },
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: '16px',
-    marginBottom: '24px',
+  title: {
+    fontSize: '22px',
+    margin: '0 0 5px',
+    fontWeight: 700
   },
   subtitle: {
-    color: '#64748b',
-    marginTop: '8px',
-    fontSize: '14px',
-  },
-  filters: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '12px',
-    marginBottom: '24px',
-    padding: '18px',
-    background: '#ffffff',
-    border: '1px solid #e5eaf2',
-    borderRadius: '12px',
-  },
-  filterGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '7px',
-    flex: '1 1 180px',
-  },
-  label: {
     fontSize: '12px',
     color: '#64748b',
+    margin: '0 0 20px'
+  },
+  panel: {
+    background: '#fff',
+    border: '1px solid #e5e7eb',
+    borderRadius: '9px',
+    padding: '15px',
+    marginBottom: '16px',
+    boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)'
+  },
+  sectionTitle: {
+    fontSize: '14px',
     fontWeight: 700,
+    margin: '0 0 13px'
+  },
+  label: {
+    display: 'block',
+    fontSize: '11px',
+    fontWeight: 600,
+    color: '#475569',
+    marginBottom: '5px'
   },
   select: {
     width: '100%',
-    minHeight: '40px',
-    padding: '8px',
-    border: '1px solid #dbe2ec',
-    borderRadius: '7px',
+    minWidth: 0,
+    padding: '8px 9px',
+    border: '1px solid #cbd5e1',
+    borderRadius: '6px',
     background: '#fff',
-    color: '#172033',
+    fontSize: '12px',
+    color: '#1f2937'
+  },
+  button: {
+    border: '1px solid #cbd5e1',
+    background: '#fff',
+    color: '#334155',
+    borderRadius: '6px',
+    padding: '9px 12px',
+    cursor: 'pointer',
+    fontSize: '12px',
+    fontWeight: 600
+  },
+  primaryButton: {
+    border: '1px solid #1d4ed8',
+    background: '#1d4ed8',
+    color: '#fff',
+    borderRadius: '6px',
+    padding: '9px 12px',
+    cursor: 'pointer',
+    fontSize: '12px',
+    fontWeight: 600
   },
   grid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
-    gap: '16px',
-    marginBottom: '24px',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))',
+    gap: '11px',
+    marginBottom: '16px'
   },
-  card: {
-    padding: '20px',
-    background: '#ffffff',
-    border: '1px solid #e5eaf2',
-    borderRadius: '12px',
-    boxShadow: '0 2px 8px rgba(15, 23, 42, 0.03)',
-    minWidth: 0,
+  kpi: {
+    background: '#fff',
+    border: '1px solid #e5e7eb',
+    borderRadius: '9px',
+    padding: '13px',
+    minWidth: 0
   },
-  metricLabel: {
-    fontSize: '13px',
+  kpiLabel: {
     color: '#64748b',
-    marginBottom: '12px',
+    fontSize: '11px',
+    marginBottom: '8px'
   },
-  metricValue: {
-    fontSize: '30px',
+  kpiValue: {
+    fontSize: '22px',
     fontWeight: 700,
-    overflowWrap: 'anywhere',
+    lineHeight: 1.2,
+    overflowWrap: 'anywhere'
   },
-  sectionTitle: {
-    fontSize: '18px',
-    margin: '0 0 18px',
-  },
-  section: {
-    padding: '22px',
-    marginBottom: '24px',
-    background: '#ffffff',
-    border: '1px solid #e5eaf2',
-    borderRadius: '12px',
-    overflowX: 'auto',
+  tableWrap: {
+    width: '100%',
+    overflowX: 'auto'
   },
   table: {
     width: '100%',
     borderCollapse: 'collapse',
-    fontSize: '13px',
-    textAlign: 'left',
+    fontSize: '11px',
+    whiteSpace: 'nowrap'
   },
   th: {
-    padding: '12px 10px',
-    background: '#f8fafc',
-    color: '#64748b',
-    borderBottom: '1px solid #e5eaf2',
-    whiteSpace: 'nowrap',
+    padding: '9px 10px',
+    background: '#f1f5f9',
+    borderBottom: '1px solid #dbe2ea',
+    textAlign: 'left',
+    fontWeight: 700,
+    color: '#334155'
   },
   td: {
-    padding: '13px 10px',
-    borderBottom: '1px solid #edf0f5',
+    padding: '8px 10px',
+    borderBottom: '1px solid #edf0f4',
+    textAlign: 'left'
   },
-  button: {
-    padding: '10px 15px',
-    border: '1px solid #dbe2ec',
+  muted: {
+    fontSize: '11px',
+    color: '#64748b',
+    lineHeight: 1.5
+  },
+  error: {
+    background: '#fff1f2',
+    color: '#9f1239',
+    border: '1px solid #fecdd3',
+    padding: '12px',
     borderRadius: '7px',
-    background: '#ffffff',
-    cursor: 'pointer',
-    fontWeight: 600,
-  },
+    marginBottom: '15px',
+    fontSize: '12px'
+  }
 };
 
 function number(value) {
   return Number(value || 0).toLocaleString('en-IN');
 }
 
-function percentage(value) {
+function percent(value) {
   return `${Number(value || 0).toFixed(1)}%`;
 }
 
-function MetricCard({ label, value, note }) {
-  return (
-    <div style={styles.card}>
-      <div style={styles.metricLabel}>{label}</div>
-      <div style={styles.metricValue}>{value}</div>
-      {note ? (
-        <div style={{ marginTop: '9px', color: '#64748b', fontSize: '12px' }}>
-          {note}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function SummaryTable({ title, rows, showName = true }) {
+function SummaryTable({ rows, firstColumn, columns }) {
   if (!rows || rows.length === 0) {
-    return (
-      <section style={styles.section}>
-        <h2 style={styles.sectionTitle}>{title}</h2>
-        <p style={{ color: '#64748b' }}>No summary data available.</p>
-      </section>
-    );
+    return <p style={styles.muted}>No data available for the selected filters.</p>;
   }
 
   return (
-    <section style={styles.section}>
-      <h2 style={styles.sectionTitle}>{title}</h2>
-
+    <div style={styles.tableWrap}>
       <table style={styles.table}>
         <thead>
           <tr>
-            {showName ? <th style={styles.th}>Category</th> : null}
-            <th style={styles.th}>Learners</th>
-            <th style={styles.th}>Fully Submitted</th>
-            <th style={styles.th}>Partially Submitted</th>
-            <th style={styles.th}>Not Submitted</th>
-            <th style={styles.th}>Expected Subjects</th>
-            <th style={styles.th}>Submitted Subjects</th>
-            <th style={styles.th}>Pending Subjects</th>
-            <th style={styles.th}>Avg. Submission</th>
-            <th style={styles.th}>Completion Rate</th>
+            <th style={styles.th}>{firstColumn}</th>
+            {columns.map(column => (
+              <th key={column.key} style={styles.th}>
+                {column.label}
+              </th>
+            ))}
           </tr>
         </thead>
-
         <tbody>
           {rows.map((row, index) => (
-            <tr key={`${row.name || 'category'}-${index}`}>
-              {showName ? (
-                <td style={styles.td}>
-                  <strong>{row.name || 'Not specified'}</strong>
+            <tr key={`${row.name || row.mentor || 'row'}-${index}`}>
+              <td style={styles.td}>{row.name || row.mentor || '—'}</td>
+              {columns.map(column => (
+                <td key={column.key} style={styles.td}>
+                  {column.format
+                    ? column.format(row[column.key])
+                    : number(row[column.key])}
                 </td>
-              ) : null}
-              <td style={styles.td}>{number(row.learners)}</td>
-              <td style={styles.td}>{number(row.fullySubmitted)}</td>
-              <td style={styles.td}>{number(row.partiallySubmitted)}</td>
-              <td style={styles.td}>{number(row.notSubmitted)}</td>
-              <td style={styles.td}>{number(row.expectedSubjects)}</td>
-              <td style={styles.td}>{number(row.submittedSubjects)}</td>
-              <td style={styles.td}>{number(row.pendingSubjects)}</td>
-              <td style={styles.td}>{percentage(row.averageSubmission)}</td>
-              <td style={styles.td}>{percentage(row.completionRate)}</td>
+              ))}
             </tr>
           ))}
         </tbody>
       </table>
-    </section>
+    </div>
   );
 }
 
-export default function Home() {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+function downloadCsv(rows) {
+  if (!rows || rows.length === 0) return;
 
+  // These are the only columns included in the downloaded file.
+  const headers = [
+    'Roll No.',
+    'Program',
+    'Mentor',
+    'Pending Subjects'
+  ];
+
+  const csvCell = value => {
+    const safeValue = String(value == null ? '' : value);
+    return `"${safeValue.replace(/"/g, '""')}"`;
+  };
+
+  const lines = [
+    headers.map(csvCell).join(','),
+    ...rows.map(row => [
+      row.rollNo,
+      row.program,
+      row.mentor,
+      row.pendingSubjects
+    ].map(csvCell).join(','))
+  ];
+
+  // UTF-8 BOM helps Excel display text correctly.
+  const blob = new Blob(
+    ['\uFEFF' + lines.join('\r\n')],
+    { type: 'text/csv;charset=utf-8;' }
+  );
+
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+
+  link.href = url;
+  link.download = 'IA_Pending_Subjects.csv';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+export default function Dashboard() {
+  const [data, setData] = useState(null);
   const [program, setProgram] = useState('');
   const [salesType, setSalesType] = useState('');
   const [mentor, setMentor] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -217,31 +257,20 @@ export default function Home() {
       if (mentor) params.set('mentor', mentor);
 
       const query = params.toString();
-      const endpoint = query
-        ? `/api/dashboard?${query}`
-        : '/api/dashboard';
-
-      const response = await fetch(endpoint, {
-        method: 'GET',
-        headers: { Accept: 'application/json' },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Request failed with status ${response.status}`);
-      }
+      const response = await fetch(
+        `/api/dashboard${query ? `?${query}` : ''}`
+      );
 
       const json = await response.json();
 
-      if (json.error) {
-        throw new Error(json.error);
+      if (!response.ok || json.error) {
+        throw new Error(json.error || `Request failed: ${response.status}`);
       }
 
       setData(json);
-    } catch (e) {
-      setError(
-        'Unable to load dashboard data. ' +
-          (e instanceof Error ? e.message : String(e))
-      );
+    } catch (err) {
+      setError(err.message || 'Unable to load dashboard data.');
+      setData(null);
     } finally {
       setLoading(false);
     }
@@ -251,258 +280,325 @@ export default function Home() {
     load();
   }, [load]);
 
-  const filters = data?.filters || {};
-  const kpis = data?.kpis || {};
+  const kpis = data?.kpis || initialKpis;
+  const pendingLearners = data?.pendingLearners || [];
+  const mentorProgramSummary = data?.mentorProgramSummary || [];
 
-  const selectStyle = styles.select;
+  const resetFilters = () => {
+    setProgram('');
+    setSalesType('');
+    setMentor('');
+  };
 
   return (
     <main style={styles.page}>
       <div style={styles.container}>
-        <header style={styles.header}>
-          <div>
-            <h1 style={{ margin: 0, fontSize: '28px' }}>
-              IA Submission Dashboard
-            </h1>
-            <p style={styles.subtitle}>
-              Internal Assessment submission overview
-            </p>
-          </div>
-
-          <button
-            type="button"
-            style={styles.button}
-            onClick={load}
-            disabled={loading}
-          >
-            {loading ? 'Refreshing...' : 'Refresh Data'}
-          </button>
+        <header>
+          <h1 style={styles.title}>IA Submission Dashboard</h1>
+          <p style={styles.subtitle}>
+            Internal Assessment submission tracking and mentor-wise analysis
+          </p>
         </header>
 
-        <section style={styles.filters}>
-          <div style={styles.filterGroup}>
-            <label style={styles.label} htmlFor="program-filter">
-              PROGRAM
-            </label>
-            <select
-              id="program-filter"
-              style={selectStyle}
-              value={program}
-              onChange={(e) => setProgram(e.target.value)}
-            >
-              <option value="">All Programs</option>
-              {(filters.programs || []).map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </select>
+        {error && (
+          <div style={styles.error}>
+            <strong>Unable to load dashboard:</strong> {error}
+            <div style={{ marginTop: '9px' }}>
+              <button style={styles.button} onClick={load}>
+                Retry
+              </button>
+            </div>
           </div>
+        )}
 
-          <div style={styles.filterGroup}>
-            <label style={styles.label} htmlFor="sales-filter">
-              SALES TYPE
-            </label>
-            <select
-              id="sales-filter"
-              style={selectStyle}
-              value={salesType}
-              onChange={(e) => setSalesType(e.target.value)}
-            >
-              <option value="">All Sales Types</option>
-              {(filters.salesTypes || []).map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div style={styles.filterGroup}>
-            <label style={styles.label} htmlFor="mentor-filter">
-              PRIMARY MENTOR
-            </label>
-            <select
-              id="mentor-filter"
-              style={selectStyle}
-              value={mentor}
-              onChange={(e) => setMentor(e.target.value)}
-            >
-              <option value="">All Mentors</option>
-              {(filters.mentors || []).map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </select>
-          </div>
+        <section style={styles.panel}>
+          <h2 style={styles.sectionTitle}>Filters</h2>
 
           <div
             style={{
-              display: 'flex',
-              alignItems: 'end',
-              paddingBottom: '1px',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+              gap: '12px',
+              alignItems: 'end'
             }}
           >
-            <button
-              type="button"
-              style={styles.button}
-              onClick={() => {
-                setProgram('');
-                setSalesType('');
-                setMentor('');
-              }}
-            >
-              Clear Filters
-            </button>
+            <div>
+              <label style={styles.label}>Program</label>
+              <select
+                style={styles.select}
+                value={program}
+                onChange={event => setProgram(event.target.value)}
+              >
+                <option value="">All Programs</option>
+                {(data?.filters?.programs || []).map(item => (
+                  <option key={item} value={item}>{item}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label style={styles.label}>Sales Type</label>
+              <select
+                style={styles.select}
+                value={salesType}
+                onChange={event => setSalesType(event.target.value)}
+              >
+                <option value="">All Sales Types</option>
+                {(data?.filters?.salesTypes || []).map(item => (
+                  <option key={item} value={item}>{item}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label style={styles.label}>Mentor</label>
+              <select
+                style={styles.select}
+                value={mentor}
+                onChange={event => setMentor(event.target.value)}
+              >
+                <option value="">All Mentors</option>
+                {(data?.filters?.mentors || []).map(item => (
+                  <option key={item} value={item}>{item}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button style={styles.button} onClick={resetFilters}>
+                Clear Filters
+              </button>
+              <button style={styles.button} onClick={load} disabled={loading}>
+                {loading ? 'Refreshing…' : 'Refresh Data'}
+              </button>
+            </div>
+          </div>
+
+          {loading && (
+            <p style={{ ...styles.muted, marginBottom: 0, marginTop: '10px' }}>
+              Loading dashboard data…
+            </p>
+          )}
+        </section>
+
+        <section style={styles.grid}>
+          {[
+            ['Total Learners', number(kpis.totalLearners)],
+            ['Fully Submitted', number(kpis.fullySubmitted)],
+            ['Partial Submission', number(kpis.partiallySubmitted)],
+            ['Nil Submission', number(kpis.notSubmitted)],
+            ['Average Submission', percent(kpis.averageSubmission)],
+            ['Full Submission Rate', percent(kpis.fullySubmittedRate)],
+            ['Expected Subjects', number(kpis.expectedSubjects)],
+            ['Submitted Subjects', number(kpis.submittedSubjects)],
+            ['Pending Subject Count', number(kpis.pendingSubjects)]
+          ].map(([label, value]) => (
+            <div key={label} style={styles.kpi}>
+              <div style={styles.kpiLabel}>{label}</div>
+              <div style={styles.kpiValue}>{loading ? '—' : value}</div>
+            </div>
+          ))}
+        </section>
+
+        <section style={styles.panel}>
+          <h2 style={styles.sectionTitle}>Submission Status</h2>
+          <div style={{ display: 'grid', gap: '12px' }}>
+            {(data?.statusSummary || []).map(item => {
+              const total = Number(kpis.totalLearners || 0);
+              const width = total
+                ? Math.min(100, Number(item.count || 0) * 100 / total)
+                : 0;
+
+              return (
+                <div key={item.status}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      gap: '12px',
+                      marginBottom: '5px',
+                      fontSize: '11px'
+                    }}
+                  >
+                    <span>{item.status}</span>
+                    <strong>{number(item.count)}</strong>
+                  </div>
+                  <div
+                    style={{
+                      height: '8px',
+                      background: '#e2e8f0',
+                      borderRadius: '5px',
+                      overflow: 'hidden'
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: `${width}%`,
+                        height: '100%',
+                        background:
+                          item.status === 'Full'
+                            ? '#16a34a'
+                            : item.status === 'Partial'
+                              ? '#d97706'
+                              : '#64748b'
+                      }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </section>
 
-        {error ? (
-          <section
-            role="alert"
+        <section style={styles.panel}>
+          <h2 style={styles.sectionTitle}>Mentor-wise Program Summary</h2>
+          <p style={styles.muted}>
+            Each mentor's first two alphabetically sorted programs are shown
+            side by side. Counts update with the selected filters.
+          </p>
+
+          {mentorProgramSummary.length === 0 ? (
+            <p style={styles.muted}>No data available for the selected filters.</p>
+          ) : (
+            <div style={styles.tableWrap}>
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    <th style={styles.th} rowSpan={2}>Mentor</th>
+                    <th style={styles.th} rowSpan={2}>Program 1</th>
+                    <th style={styles.th} colSpan={3}>Program 1 Status</th>
+                    <th style={styles.th} rowSpan={2}>Program 2</th>
+                    <th style={styles.th} colSpan={3}>Program 2 Status</th>
+                  </tr>
+                  <tr>
+                    <th style={styles.th}>Full 1</th>
+                    <th style={styles.th}>Partial 1</th>
+                    <th style={styles.th}>Nil 1</th>
+                    <th style={styles.th}>Full 2</th>
+                    <th style={styles.th}>Partial 2</th>
+                    <th style={styles.th}>Nil 2</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {mentorProgramSummary.map((row, index) => (
+                    <tr key={`${row.mentor}-${index}`}>
+                      <td style={styles.td}>{row.mentor}</td>
+                      <td style={styles.td}>{row.program1 || '—'}</td>
+                      <td style={styles.td}>{number(row.full1)}</td>
+                      <td style={styles.td}>{number(row.partial1)}</td>
+                      <td style={styles.td}>{number(row.nil1)}</td>
+                      <td style={styles.td}>{row.program2 || '—'}</td>
+                      <td style={styles.td}>{number(row.full2)}</td>
+                      <td style={styles.td}>{number(row.partial2)}</td>
+                      <td style={styles.td}>{number(row.nil2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        <section style={styles.panel}>
+          <div
             style={{
-              ...styles.section,
-              color: '#b91c1c',
-              borderColor: '#fecaca',
-              background: '#fff7f7',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: '12px',
+              flexWrap: 'wrap',
+              marginBottom: '10px'
             }}
           >
-            <strong>Dashboard data could not be loaded.</strong>
-            <p>{error}</p>
-            <p>
-              Check that the Apps Script web app is deployed and that
-              <code> pages/api/dashboard.js </code>
-              contains the correct Apps Script URL.
-            </p>
-            <button type="button" style={styles.button} onClick={load}>
-              Try Again
-            </button>
-          </section>
-        ) : null}
+            <div>
+              <h2 style={{ ...styles.sectionTitle, marginBottom: '5px' }}>
+                Partial Submission — Pending Subjects
+              </h2>
+              <p style={styles.muted}>
+                {number(pendingLearners.length)} partially submitted learners
+                match the current filters.
+              </p>
+            </div>
 
-        {loading && !data ? (
-          <section style={styles.section}>
-            Loading dashboard data...
-          </section>
-        ) : null}
-
-        {!loading && !error && data ? (
-          <>
-            <section style={styles.grid}>
-              <MetricCard
-                label="Total Learners"
-                value={number(kpis.totalLearners)}
-              />
-              <MetricCard
-                label="Fully Submitted"
-                value={number(kpis.fullySubmitted)}
-                note={percentage(kpis.fullySubmittedRate)}
-              />
-              <MetricCard
-                label="Partially Submitted"
-                value={number(kpis.partiallySubmitted)}
-              />
-              <MetricCard
-                label="Not Submitted"
-                value={number(kpis.notSubmitted)}
-              />
-              <MetricCard
-                label="Average Submission"
-                value={percentage(kpis.averageSubmission)}
-              />
-              <MetricCard
-                label="Expected Subjects"
-                value={number(kpis.expectedSubjects)}
-              />
-              <MetricCard
-                label="Submitted Subjects"
-                value={number(kpis.submittedSubjects)}
-              />
-              <MetricCard
-                label="Pending Subjects"
-                value={number(kpis.pendingSubjects)}
-              />
-            </section>
-
-            <section style={styles.section}>
-              <h2 style={styles.sectionTitle}>Submission Status</h2>
-
-              {(data.statusSummary || []).map((item) => {
-                const total = Number(kpis.totalLearners || 0);
-                const rate = total
-                  ? (Number(item.value || 0) / total) * 100
-                  : 0;
-
-                return (
-                  <div key={item.name} style={{ marginBottom: '18px' }}>
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        gap: '12px',
-                        marginBottom: '7px',
-                        fontSize: '13px',
-                      }}
-                    >
-                      <span>{item.name}</span>
-                      <strong>
-                        {number(item.value)} ({percentage(rate)})
-                      </strong>
-                    </div>
-
-                    <div
-                      style={{
-                        height: '10px',
-                        background: '#edf1f7',
-                        borderRadius: '8px',
-                        overflow: 'hidden',
-                      }}
-                    >
-                      <div
-                        style={{
-                          height: '100%',
-                          width: `${Math.min(100, rate)}%`,
-                          background: '#4969d8',
-                          borderRadius: '8px',
-                        }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </section>
-
-            <SummaryTable
-              title="Program-wise Summary"
-              rows={data.programSummary}
-            />
-
-            <SummaryTable
-              title="Sales Type Summary"
-              rows={data.salesSummary}
-            />
-
-            <SummaryTable
-              title="Mentor-wise Summary"
-              rows={data.mentorSummary}
-            />
-
-            <p
+            <button
               style={{
-                color: '#64748b',
-                fontSize: '12px',
-                textAlign: 'right',
-                marginTop: '16px',
+                ...styles.primaryButton,
+                opacity: pendingLearners.length ? 1 : 0.55,
+                cursor: pendingLearners.length ? 'pointer' : 'not-allowed'
               }}
+              disabled={pendingLearners.length === 0}
+              onClick={() => downloadCsv(pendingLearners)}
             >
-              Last updated:{' '}
-              {data.updatedAt
-                ? new Date(data.updatedAt).toLocaleString('en-IN')
-                : 'Not available'}
-            </p>
-          </>
-        ) : null}
+              Download Pending Subjects (CSV)
+            </button>
+          </div>
+
+          <p style={styles.muted}>
+            The download contains only Roll No., Program, Mentor, and Pending
+            Subjects. Learner names and email addresses are excluded.
+          </p>
+        </section>
+
+        <section style={styles.panel}>
+          <h2 style={styles.sectionTitle}>Program-wise Summary</h2>
+          <SummaryTable
+            rows={data?.programSummary || []}
+            firstColumn="Program"
+            columns={[
+              { key: 'totalLearners', label: 'Total Learners' },
+              { key: 'fullySubmitted', label: 'Full' },
+              { key: 'partiallySubmitted', label: 'Partial' },
+              { key: 'notSubmitted', label: 'Nil' },
+              {
+                key: 'averageSubmission',
+                label: 'Avg. Submission',
+                format: percent
+              }
+            ]}
+          />
+        </section>
+
+        <section style={styles.panel}>
+          <h2 style={styles.sectionTitle}>Sales Type Summary</h2>
+          <SummaryTable
+            rows={data?.salesSummary || []}
+            firstColumn="Sales Type"
+            columns={[
+              { key: 'totalLearners', label: 'Total Learners' },
+              { key: 'fullySubmitted', label: 'Full' },
+              { key: 'partiallySubmitted', label: 'Partial' },
+              { key: 'notSubmitted', label: 'Nil' },
+              {
+                key: 'averageSubmission',
+                label: 'Avg. Submission',
+                format: percent
+              }
+            ]}
+          />
+        </section>
+
+        <section style={styles.panel}>
+          <h2 style={styles.sectionTitle}>Mentor-wise Summary</h2>
+          <SummaryTable
+            rows={data?.mentorSummary || []}
+            firstColumn="Mentor"
+            columns={[
+              { key: 'totalLearners', label: 'Total Learners' },
+              { key: 'fullySubmitted', label: 'Full' },
+              { key: 'partiallySubmitted', label: 'Partial' },
+              { key: 'notSubmitted', label: 'Nil' },
+              {
+                key: 'averageSubmission',
+                label: 'Avg. Submission',
+                format: percent
+              }
+            ]}
+          />
+        </section>
+
+        <footer style={{ ...styles.muted, textAlign: 'center', padding: '5px' }}>
+          IA Submission Dashboard
+        </footer>
       </div>
     </main>
   );
