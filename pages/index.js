@@ -150,9 +150,20 @@ function textValue(value) {
 }
 
 /*
- * Summary table.
- * Text columns must not be formatted as numbers.
+ * Convert a pending-subject value into readable course codes.
+ * Supports comma, semicolon, pipe, or line-break separated values.
+ * If the source contains a single value such as "5", it remains "5";
+ * actual course codes must be supplied by the source data.
  */
+function getPendingSubjectCodes(row) {
+  const value =
+    row?.pendingSubjectCodes ??
+    row?.pendingSubjects ??
+    '';
+
+  return String(value || '').trim();
+}
+
 function SummaryTable({ rows, firstColumn, columns }) {
   if (!rows || rows.length === 0) {
     return (
@@ -168,7 +179,6 @@ function SummaryTable({ rows, firstColumn, columns }) {
         <thead>
           <tr>
             <th style={styles.th}>{firstColumn}</th>
-
             {columns.map(column => (
               <th key={column.key} style={styles.th}>
                 {column.label}
@@ -213,10 +223,6 @@ function SummaryTable({ rows, firstColumn, columns }) {
   );
 }
 
-/*
- * Convert Mentor + Program records into the existing
- * two-program layout.
- */
 function prepareMentorProgramSummary(rows) {
   const grouped = {};
 
@@ -236,9 +242,7 @@ function prepareMentorProgramSummary(rows) {
       const programs = grouped[mentor]
         .slice()
         .sort((a, b) =>
-          String(a.program || '').localeCompare(
-            String(b.program || '')
-          )
+          String(a.program || '').localeCompare(String(b.program || ''))
         );
 
       const first = programs[0] || {};
@@ -258,15 +262,6 @@ function prepareMentorProgramSummary(rows) {
     });
 }
 
-/*
- * UPDATED CSV EXPORT
- *
- * Exports only:
- * Roll No. | Program | Mentor | Pending Subjects
- *
- * Supports both API field names:
- * pendingSubjectCodes and pendingSubjects.
- */
 function downloadCsv(rows) {
   if (!rows || rows.length === 0) {
     alert('No pending-subject records available to download.');
@@ -280,10 +275,6 @@ function downloadCsv(rows) {
     'Pending Subjects'
   ];
 
-  /*
-   * Escape commas, double quotes, and line breaks
-   * according to CSV formatting rules.
-   */
   const csvCell = value => {
     const text = String(value == null ? '' : value);
     return `"${text.replace(/"/g, '""')}"`;
@@ -291,30 +282,18 @@ function downloadCsv(rows) {
 
   const lines = [
     headers.map(csvCell).join(','),
-
-    ...rows.map(row => {
-      // Prefer the explicit subject-code property.
-      const subjectCodes =
-        row.pendingSubjectCodes ??
-        row.pendingSubjects ??
-        '';
-
-      return [
-        row.rollNo,
-        row.program,
-        row.mentor,
-        subjectCodes
-      ].map(csvCell).join(',');
-    })
+    ...rows.map(row => [
+      row.rollNo,
+      row.program,
+      row.mentor,
+      getPendingSubjectCodes(row)
+    ].map(csvCell).join(','))
   ];
 
-  // UTF-8 BOM supports Excel's text encoding.
   const csvContent = '\uFEFF' + lines.join('\r\n');
-
-  const blob = new Blob(
-    [csvContent],
-    { type: 'text/csv;charset=utf-8;' }
-  );
+  const blob = new Blob([csvContent], {
+    type: 'text/csv;charset=utf-8;'
+  });
 
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -326,9 +305,7 @@ function downloadCsv(rows) {
   link.click();
   link.remove();
 
-  setTimeout(() => {
-    URL.revokeObjectURL(url);
-  }, 1000);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 export default function Dashboard() {
@@ -344,10 +321,7 @@ export default function Dashboard() {
     setError('');
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(
-      () => controller.abort(),
-      60000
-    );
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
 
     try {
       const params = new URLSearchParams();
@@ -356,7 +330,6 @@ export default function Dashboard() {
       if (salesType) params.set('salesType', salesType);
       if (mentor) params.set('mentor', mentor);
 
-      // Avoid reusing a stale API response.
       params.set('_refresh', String(Date.now()));
 
       const response = await fetch(
@@ -365,14 +338,11 @@ export default function Dashboard() {
           method: 'GET',
           cache: 'no-store',
           signal: controller.signal,
-          headers: {
-            Accept: 'application/json'
-          }
+          headers: { Accept: 'application/json' }
         }
       );
 
       const responseText = await response.text();
-
       let json;
 
       try {
@@ -385,14 +355,13 @@ export default function Dashboard() {
 
       if (!response.ok || json.error) {
         throw new Error(
-          json.error ||
-          `Request failed with HTTP ${response.status}.`
+          json.error || `Request failed with HTTP ${response.status}.`
         );
       }
 
       if (!json.kpis || !json.filters) {
         throw new Error(
-          'The API response is missing dashboard data. Please check the Apps Script deployment.'
+          'The API response is missing dashboard data. Check the Apps Script deployment.'
         );
       }
 
@@ -403,9 +372,7 @@ export default function Dashboard() {
           'The dashboard request took longer than 60 seconds. Please retry. If this continues, the API response may be too slow or too large.'
         );
       } else {
-        setError(
-          err.message || 'Unable to load dashboard data.'
-        );
+        setError(err.message || 'Unable to load dashboard data.');
       }
     } finally {
       clearTimeout(timeoutId);
@@ -431,14 +398,6 @@ export default function Dashboard() {
     kpis.fullySubmitted ?? kpis.full ?? 0
   );
 
-  const partialCount = Number(
-    kpis.partiallySubmitted ?? kpis.partial ?? 0
-  );
-
-  const nilCount = Number(
-    kpis.notSubmitted ?? kpis.nil ?? 0
-  );
-
   const fullRate = totalLearners
     ? (fullCount / totalLearners) * 100
     : 0;
@@ -453,10 +412,7 @@ export default function Dashboard() {
     <main style={styles.page}>
       <div style={styles.container}>
         <header>
-          <h1 style={styles.title}>
-            IA Submission Dashboard
-          </h1>
-
+          <h1 style={styles.title}>IA Submission Dashboard</h1>
           <p style={styles.subtitle}>
             Internal Assessment submission tracking and mentor-wise analysis
           </p>
@@ -465,7 +421,6 @@ export default function Dashboard() {
         {error && (
           <div style={styles.error}>
             <strong>Unable to load dashboard:</strong> {error}
-
             <div style={{ marginTop: '9px' }}>
               <button
                 style={styles.button}
@@ -484,73 +439,54 @@ export default function Dashboard() {
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns:
-                'repeat(auto-fit, minmax(180px, 1fr))',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
               gap: '12px',
               alignItems: 'end'
             }}
           >
             <div>
               <label style={styles.label}>Program</label>
-
               <select
                 style={styles.select}
                 value={program}
                 onChange={event => setProgram(event.target.value)}
               >
                 <option value="">All Programs</option>
-
                 {(data?.filters?.programs || []).map(item => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
+                  <option key={item} value={item}>{item}</option>
                 ))}
               </select>
             </div>
 
             <div>
               <label style={styles.label}>Sales Type</label>
-
               <select
                 style={styles.select}
                 value={salesType}
                 onChange={event => setSalesType(event.target.value)}
               >
                 <option value="">All Sales Types</option>
-
                 {(data?.filters?.salesTypes || []).map(item => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
+                  <option key={item} value={item}>{item}</option>
                 ))}
               </select>
             </div>
 
             <div>
               <label style={styles.label}>Mentor</label>
-
               <select
                 style={styles.select}
                 value={mentor}
                 onChange={event => setMentor(event.target.value)}
               >
                 <option value="">All Mentors</option>
-
                 {(data?.filters?.mentors || []).map(item => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
+                  <option key={item} value={item}>{item}</option>
                 ))}
               </select>
             </div>
 
-            <div
-              style={{
-                display: 'flex',
-                gap: '8px',
-                flexWrap: 'wrap'
-              }}
-            >
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               <button
                 style={styles.button}
                 onClick={resetFilters}
@@ -558,7 +494,6 @@ export default function Dashboard() {
               >
                 Clear Filters
               </button>
-
               <button
                 style={styles.button}
                 onClick={load}
@@ -579,48 +514,27 @@ export default function Dashboard() {
         <section style={styles.grid}>
           {[
             ['Total Learners', number(kpis.totalLearners)],
-            [
-              'Fully Submitted',
-              number(kpis.fullySubmitted ?? kpis.full)
-            ],
-            [
-              'Partial Submission',
-              number(kpis.partiallySubmitted ?? kpis.partial)
-            ],
-            [
-              'Nil Submission',
-              number(kpis.notSubmitted ?? kpis.nil)
-            ],
-            [
-              'Average Submission',
-              percent(kpis.averageSubmission ?? kpis.avgSubmission)
-            ],
+            ['Fully Submitted', number(kpis.fullySubmitted ?? kpis.full)],
+            ['Partial Submission', number(kpis.partiallySubmitted ?? kpis.partial)],
+            ['Nil Submission', number(kpis.notSubmitted ?? kpis.nil)],
+            ['Average Submission', percent(kpis.averageSubmission ?? kpis.avgSubmission)],
             ['Full Submission Rate', percent(fullRate)]
           ].map(([label, value]) => (
             <div key={label} style={styles.kpi}>
               <div style={styles.kpiLabel}>{label}</div>
-
-              <div style={styles.kpiValue}>
-                {loading ? '—' : value}
-              </div>
+              <div style={styles.kpiValue}>{loading ? '—' : value}</div>
             </div>
           ))}
         </section>
 
         <section style={styles.panel}>
-          <h2 style={styles.sectionTitle}>
-            Submission Status
-          </h2>
+          <h2 style={styles.sectionTitle}>Submission Status</h2>
 
           <div style={{ display: 'grid', gap: '12px' }}>
             {(data?.statusSummary || []).map(item => {
               const total = Number(kpis.totalLearners || 0);
-
               const width = total
-                ? Math.min(
-                    100,
-                    Number(item.count || 0) * 100 / total
-                  )
+                ? Math.min(100, Number(item.count || 0) * 100 / total)
                 : 0;
 
               return (
@@ -665,18 +579,13 @@ export default function Dashboard() {
         </section>
 
         <section style={styles.panel}>
-          <h2 style={styles.sectionTitle}>
-            Mentor-wise Program Summary
-          </h2>
-
+          <h2 style={styles.sectionTitle}>Mentor-wise Program Summary</h2>
           <p style={styles.muted}>
             Shows the first two programs alphabetically for each mentor.
           </p>
 
           {mentorProgramSummary.length === 0 ? (
-            <p style={styles.muted}>
-              No data available for the selected filters.
-            </p>
+            <p style={styles.muted}>No data available for the selected filters.</p>
           ) : (
             <div style={styles.tableWrap}>
               <table style={styles.table}>
@@ -688,7 +597,6 @@ export default function Dashboard() {
                     <th style={styles.th} rowSpan={2}>Program 2</th>
                     <th style={styles.th} colSpan={3}>Program 2 Status</th>
                   </tr>
-
                   <tr>
                     <th style={styles.th}>Full 1</th>
                     <th style={styles.th}>Partial 1</th>
@@ -720,10 +628,7 @@ export default function Dashboard() {
         </section>
 
         <section style={styles.panel}>
-          <h2 style={styles.sectionTitle}>
-            Mentor-wise Sales Type Summary
-          </h2>
-
+          <h2 style={styles.sectionTitle}>Mentor-wise Sales Type Summary</h2>
           <p style={styles.muted}>
             One row per mentor and sales type. Program is not included in this table.
           </p>
@@ -732,11 +637,7 @@ export default function Dashboard() {
             rows={mentorSalesSummary}
             firstColumn="Mentor"
             columns={[
-              {
-                key: 'salesType',
-                label: 'Sales Type',
-                type: 'text'
-              },
+              { key: 'salesType', label: 'Sales Type', type: 'text' },
               { key: 'totalLearners', label: 'Total Learners' },
               { key: 'fullySubmitted', label: 'Full' },
               { key: 'partiallySubmitted', label: 'Partial' },
@@ -745,6 +646,7 @@ export default function Dashboard() {
           />
         </section>
 
+        {/* UPDATED: Actual pending course codes are visible in this table. */}
         <section style={styles.panel}>
           <div
             style={{
@@ -756,29 +658,20 @@ export default function Dashboard() {
             }}
           >
             <div>
-              <h2
-                style={{
-                  ...styles.sectionTitle,
-                  marginBottom: '5px'
-                }}
-              >
+              <h2 style={{ ...styles.sectionTitle, marginBottom: '5px' }}>
                 Partial Submission — Pending Subjects
               </h2>
-
               <p style={styles.muted}>
-                {number(pendingLearners.length)} partially submitted learners match the filters.
+                {number(pendingLearners.length)} learners match the selected filters.
               </p>
             </div>
 
             <button
               style={{
                 ...styles.primaryButton,
-                opacity:
-                  pendingLearners.length && !loading ? 1 : 0.55
+                opacity: pendingLearners.length && !loading ? 1 : 0.55
               }}
-              disabled={
-                pendingLearners.length === 0 || loading
-              }
+              disabled={pendingLearners.length === 0 || loading}
               onClick={() => downloadCsv(pendingLearners)}
             >
               Download Pending Subjects (CSV)
@@ -786,16 +679,52 @@ export default function Dashboard() {
           </div>
 
           <p style={styles.muted}>
-            The CSV includes only Roll No., Program, Mentor, and Pending Subjects.
+            Displays the pending course codes returned by Apps Script.
             Learner names and email addresses are excluded.
           </p>
+
+          {pendingLearners.length === 0 ? (
+            <p style={styles.muted}>
+              No partially submitted learners found for the selected filters.
+            </p>
+          ) : (
+            <div style={styles.tableWrap}>
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    <th style={styles.th}>Roll No.</th>
+                    <th style={styles.th}>Program</th>
+                    <th style={styles.th}>Mentor</th>
+                    <th style={styles.th}>Pending Course Codes</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {pendingLearners.map((row, index) => (
+                    <tr key={`${row.rollNo || 'learner'}-${index}`}>
+                      <td style={styles.td}>{textValue(row.rollNo)}</td>
+                      <td style={styles.td}>{textValue(row.program)}</td>
+                      <td style={styles.td}>{textValue(row.mentor)}</td>
+                      <td
+                        style={{
+                          ...styles.td,
+                          whiteSpace: 'normal',
+                          minWidth: '220px',
+                          overflowWrap: 'anywhere'
+                        }}
+                      >
+                        {textValue(getPendingSubjectCodes(row))}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </section>
 
         <section style={styles.panel}>
-          <h2 style={styles.sectionTitle}>
-            Program-wise Summary
-          </h2>
-
+          <h2 style={styles.sectionTitle}>Program-wise Summary</h2>
           <SummaryTable
             rows={data?.programSummary || []}
             firstColumn="Program"
@@ -809,10 +738,7 @@ export default function Dashboard() {
         </section>
 
         <section style={styles.panel}>
-          <h2 style={styles.sectionTitle}>
-            Sales Type Summary
-          </h2>
-
+          <h2 style={styles.sectionTitle}>Sales Type Summary</h2>
           <SummaryTable
             rows={data?.salesSummary || []}
             firstColumn="Sales Type"
@@ -826,10 +752,7 @@ export default function Dashboard() {
         </section>
 
         <section style={styles.panel}>
-          <h2 style={styles.sectionTitle}>
-            Mentor-wise Summary
-          </h2>
-
+          <h2 style={styles.sectionTitle}>Mentor-wise Summary</h2>
           <SummaryTable
             rows={data?.mentorSummary || []}
             firstColumn="Mentor"
