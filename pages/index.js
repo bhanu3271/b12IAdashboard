@@ -657,8 +657,8 @@ export default function Dashboard() {
                   <tr>
                     {[
                       'Programme Name',
-                      'B11 Channel',
-                      'B11 Inside',
+                      'B12 Channel',
+                      'B12 Inside',
                       'Total Learners',
                       'Target %',
                       'Full Submission Channel %',
