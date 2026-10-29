@@ -1,3 +1,4 @@
+
 import { useCallback, useEffect, useState } from 'react';
 
 const initialKpis = {
@@ -17,24 +18,20 @@ const styles = {
     fontFamily: 'Arial, Helvetica, sans-serif',
     fontSize: '12px'
   },
-
   container: {
     maxWidth: '1500px',
     margin: '0 auto'
   },
-
   title: {
     fontSize: '22px',
     margin: '0 0 5px',
     fontWeight: 700
   },
-
   subtitle: {
     fontSize: '12px',
     color: '#64748b',
     margin: '0 0 20px'
   },
-
   panel: {
     background: '#fff',
     border: '1px solid #e5e7eb',
@@ -43,13 +40,11 @@ const styles = {
     marginBottom: '16px',
     boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)'
   },
-
   sectionTitle: {
     fontSize: '14px',
     fontWeight: 700,
     margin: '0 0 13px'
   },
-
   label: {
     display: 'block',
     fontSize: '11px',
@@ -57,7 +52,6 @@ const styles = {
     color: '#475569',
     marginBottom: '5px'
   },
-
   select: {
     width: '100%',
     minWidth: 0,
@@ -68,7 +62,6 @@ const styles = {
     fontSize: '12px',
     color: '#1f2937'
   },
-
   button: {
     border: '1px solid #cbd5e1',
     background: '#fff',
@@ -79,7 +72,6 @@ const styles = {
     fontSize: '12px',
     fontWeight: 600
   },
-
   primaryButton: {
     border: '1px solid #1d4ed8',
     background: '#1d4ed8',
@@ -90,14 +82,12 @@ const styles = {
     fontSize: '13px',
     fontWeight: 600
   },
-
   grid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))',
     gap: '11px',
     marginBottom: '16px'
   },
-
   kpi: {
     background: '#fff',
     border: '1px solid #e5e7eb',
@@ -105,32 +95,27 @@ const styles = {
     padding: '13px',
     minWidth: 0
   },
-
   kpiLabel: {
     color: '#64748b',
     fontSize: '11px',
     marginBottom: '8px'
   },
-
   kpiValue: {
     fontSize: '22px',
     fontWeight: 700,
     lineHeight: 1.2,
     overflowWrap: 'anywhere'
   },
-
   tableWrap: {
     width: '100%',
     overflowX: 'auto'
   },
-
   table: {
     width: '100%',
     borderCollapse: 'collapse',
     fontSize: '11px',
     whiteSpace: 'nowrap'
   },
-
   th: {
     padding: '9px 10px',
     background: '#f1f5f9',
@@ -139,19 +124,16 @@ const styles = {
     fontWeight: 700,
     color: '#334155'
   },
-
   td: {
     padding: '8px 10px',
     borderBottom: '1px solid #edf0f4',
     textAlign: 'left'
   },
-
   muted: {
     fontSize: '11px',
     color: '#64748b',
     lineHeight: 1.5
   },
-
   error: {
     background: '#fff1f2',
     color: '#9f1239',
@@ -195,6 +177,10 @@ function changePercent(value) {
   }
 
   const n = Number(value);
+
+  if (!Number.isFinite(n)) {
+    return 'No baseline';
+  }
 
   return `${n > 0 ? '+' : ''}${n.toFixed(1)} pp`;
 }
@@ -266,7 +252,7 @@ function SummaryTable({ rows, firstColumn, columns }) {
   );
 }
 
-/* UPDATED: supports up to three programs per mentor */
+/* Supports up to three programs per mentor */
 function prepareMentorProgramSummary(rows) {
   const grouped = {};
 
@@ -449,14 +435,12 @@ export default function Dashboard() {
       }
 
       setData(json);
-
     } catch (err) {
       setError(
         err.name === 'AbortError'
           ? 'The dashboard request took longer than 60 seconds. Please retry.'
           : (err.message || 'Unable to load dashboard data.')
       );
-
     } finally {
       clearTimeout(timeoutId);
       setLoading(false);
@@ -468,9 +452,7 @@ export default function Dashboard() {
   }, [load]);
 
   const kpis = data?.kpis || initialKpis;
-
   const pendingLearners = data?.pendingLearners || [];
-
   const mentorSalesSummary = data?.mentorSalesSummary || [];
 
   const mentorProgramSummary = prepareMentorProgramSummary(
@@ -502,7 +484,6 @@ export default function Dashboard() {
   return (
     <main style={styles.page}>
       <div style={styles.container}>
-
         <header>
           <h1 style={styles.title}>
             IA Submission Dashboard
@@ -644,6 +625,7 @@ export default function Dashboard() {
             Submission percentages use the selected filters.
             Grand Total percentages are calculated from combined learner counts,
             not by averaging programme percentages.
+            Change columns show the difference from the previous available snapshot.
           </p>
 
           {!programmePerformanceTable.length ? (
@@ -664,9 +646,11 @@ export default function Dashboard() {
                       'Full Submission Channel %',
                       'Full Submission Inside %',
                       'Overall Full %',
+                      'Change in Full %',
                       'Full + Partial Channel %',
                       'Full + Partial Inside %',
-                      'Overall Full + Partial %'
+                      'Overall Full + Partial %',
+                      'Change in Full + Partial %'
                     ].map(h => (
                       <th key={h} style={styles.th}>{h}</th>
                     ))}
@@ -697,9 +681,26 @@ export default function Dashboard() {
                       <td style={styles.td}>{percent(r.fullChannelPercent)}</td>
                       <td style={styles.td}>{percent(r.fullInsidePercent)}</td>
                       <td style={styles.td}>{percent(r.overallFullPercent)}</td>
-                      <td style={styles.td}>{percent(r.fullPartialChannelPercent)}</td>
-                      <td style={styles.td}>{percent(r.fullPartialInsidePercent)}</td>
-                      <td style={styles.td}>{percent(r.overallFullPartialPercent)}</td>
+
+                      <td style={styles.td}>
+                        {changePercent(r.changeFullPercent)}
+                      </td>
+
+                      <td style={styles.td}>
+                        {percent(r.fullPartialChannelPercent)}
+                      </td>
+
+                      <td style={styles.td}>
+                        {percent(r.fullPartialInsidePercent)}
+                      </td>
+
+                      <td style={styles.td}>
+                        {percent(r.overallFullPartialPercent)}
+                      </td>
+
+                      <td style={styles.td}>
+                        {changePercent(r.changeFullPartialPercent)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -840,7 +841,7 @@ export default function Dashboard() {
           </div>
         </section>
 
-        {/* UPDATED MENTOR-WISE PROGRAM SUMMARY: PROGRAM 1, 2 AND 3 */}
+        {/* MENTOR-WISE PROGRAM SUMMARY */}
         <section style={styles.panel}>
           <h2 style={styles.sectionTitle}>
             Mentor-wise Program Summary
@@ -861,13 +862,10 @@ export default function Dashboard() {
                 <thead>
                   <tr>
                     <th style={styles.th} rowSpan={2}>Mentor</th>
-
                     <th style={styles.th} rowSpan={2}>Program 1</th>
                     <th style={styles.th} colSpan={3}>Program 1 Status</th>
-
                     <th style={styles.th} rowSpan={2}>Program 2</th>
                     <th style={styles.th} colSpan={3}>Program 2 Status</th>
-
                     <th style={styles.th} rowSpan={2}>Program 3</th>
                     <th style={styles.th} colSpan={3}>Program 3 Status</th>
                   </tr>
@@ -1032,7 +1030,6 @@ export default function Dashboard() {
         >
           IA Submission Dashboard
         </footer>
-
       </div>
     </main>
   );
