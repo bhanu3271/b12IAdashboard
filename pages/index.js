@@ -1,3 +1,4 @@
+
 import { useCallback, useEffect, useState } from 'react';
 
 const initialKpis = {
@@ -5,6 +6,8 @@ const initialKpis = {
   fullySubmitted: 0,
   partiallySubmitted: 0,
   nilSubmission: 0,
+  fullPercent: 0,
+  fullPartialPercent: 0,
   pendingSubjectCount: 0
 };
 
@@ -153,6 +156,22 @@ function getPendingSubjectCodes(row) {
   ).trim();
 }
 
+function prepareMentorProgramSummary(rows) {
+  // Keep every mentor-program combination returned by Apps Script.
+  // Do not limit the number of programs shown per mentor.
+  return (rows || []).slice().sort((a, b) => {
+    const mentorCompare = String(a.mentor || '').localeCompare(
+      String(b.mentor || '')
+    );
+
+    if (mentorCompare !== 0) return mentorCompare;
+
+    return String(a.program || '').localeCompare(
+      String(b.program || '')
+    );
+  });
+}
+
 function SummaryTable({ rows, firstColumn, columns }) {
   if (!rows || rows.length === 0) {
     return (
@@ -177,7 +196,9 @@ function SummaryTable({ rows, firstColumn, columns }) {
         </thead>
         <tbody>
           {rows.map((row, index) => (
-            <tr key={`${row.name || row.mentor || row.salesType || 'row'}-${index}`}>
+            <tr
+              key={`${row.name || row.mentor || row.salesType || 'row'}-${index}`}
+            >
               <td style={styles.td}>
                 {textValue(row.name || row.mentor || row.salesType)}
               </td>
@@ -196,41 +217,6 @@ function SummaryTable({ rows, firstColumn, columns }) {
       </table>
     </div>
   );
-}
-
-function prepareMentorProgramSummary(rows) {
-  const grouped = {};
-
-  (rows || []).forEach(row => {
-    const mentor = row.mentor || 'Unassigned';
-    if (!grouped[mentor]) grouped[mentor] = [];
-    grouped[mentor].push(row);
-  });
-
-  return Object.keys(grouped)
-    .sort((a, b) => a.localeCompare(b))
-    .map(mentor => {
-      const programs = grouped[mentor]
-        .slice()
-        .sort((a, b) =>
-          String(a.program || '').localeCompare(String(b.program || ''))
-        );
-
-      const first = programs[0] || {};
-      const second = programs[1] || {};
-
-      return {
-        mentor,
-        program1: first.program || '',
-        full1: first.full || 0,
-        partial1: first.partial || 0,
-        nil1: first.nil || 0,
-        program2: second.program || '',
-        full2: second.full || 0,
-        partial2: second.partial || 0,
-        nil2: second.nil || 0
-      };
-    });
 }
 
 function downloadCsv(rows) {
@@ -315,6 +301,7 @@ export default function Dashboard() {
       if (salesType) params.set('salesType', salesType);
       if (mentor) params.set('mentor', mentor);
 
+      // Prevent an old browser or CDN response from being reused.
       params.set('_refresh', String(Date.now()));
 
       const response = await fetch(
@@ -369,25 +356,26 @@ export default function Dashboard() {
 
   const kpis = data?.kpis || initialKpis;
   const pendingLearners = data?.pendingLearners || [];
+
   const mentorProgramSummary = prepareMentorProgramSummary(
     data?.mentorProgramSummary || []
   );
+
   const mentorSalesSummary = data?.mentorSalesSummary || [];
-
-  function resetFilters() {
-    setProgram('');
-    setSalesType('');
-    setMentor('');
-  }
-
+  const programmeSummary = data?.programSummary || [];
   const statusItems = data?.statusSummary || [];
+
   const comparisonMap = {};
 
   (data?.yesterdayComparison?.byProgram || []).forEach(row => {
     comparisonMap[`${row.program}||${row.salesType}`] = row;
   });
 
-  const programmeSummary = data?.programSummary || [];
+  function resetFilters() {
+    setProgram('');
+    setSalesType('');
+    setMentor('');
+  }
 
   return (
     <main style={styles.page}>
@@ -518,15 +506,14 @@ export default function Dashboard() {
           </h2>
 
           <p style={styles.muted}>
-            Full % = fully submitted learners ÷ total learners.
+            Full % = fully submitted learners divided by total learners.
             Full + Partial % = learners who submitted at least one subject
-            ÷ total learners. Daily changes are shown in percentage points.
+            divided by total learners. Daily changes are shown in percentage
+            points.
           </p>
 
           {!programmeSummary.length ? (
-            <p style={styles.muted}>
-              No programme summary available.
-            </p>
+            <p style={styles.muted}>No programme summary available.</p>
           ) : (
             <div style={styles.tableWrap}>
               <table style={styles.table}>
@@ -587,7 +574,7 @@ export default function Dashboard() {
           <p style={{ ...styles.muted, marginTop: 10 }}>
             Snapshot status: {data?.snapshotInfo?.message || 'Status unavailable'}.
             The first snapshot establishes the baseline. Comparisons become
-            available after a later day's snapshot is saved.
+            available after a later day&apos;s snapshot is saved.
           </p>
         </section>
 
@@ -612,7 +599,9 @@ export default function Dashboard() {
                     }}
                   >
                     <span>{item.status}</span>
-                    <strong>{number(item.count)} ({percent(item.percentage)})</strong>
+                    <strong>
+                      {number(item.count)} ({percent(item.percentage)})
+                    </strong>
                   </div>
 
                   <div
@@ -642,46 +631,53 @@ export default function Dashboard() {
           </div>
         </section>
 
+        {/* FIXED: All mentor-program combinations are displayed.
+            There is no limit of two programs per mentor. */}
         <section style={styles.panel}>
           <h2 style={styles.sectionTitle}>Mentor-wise Program Summary</h2>
+
           <p style={styles.muted}>
-            Shows the first two programs alphabetically for each mentor.
+            Every program returned for each mentor is shown in a separate row.
+            Mentors with three, four or more programs will have all their
+            programs displayed.
           </p>
 
           {!mentorProgramSummary.length ? (
-            <p style={styles.muted}>No data available.</p>
+            <p style={styles.muted}>
+              No mentor-program data available. If this table is empty,
+              check whether the Apps Script API returns mentorProgramSummary.
+            </p>
           ) : (
             <div style={styles.tableWrap}>
               <table style={styles.table}>
                 <thead>
                   <tr>
-                    <th style={styles.th} rowSpan={2}>Mentor</th>
-                    <th style={styles.th} rowSpan={2}>Program 1</th>
-                    <th style={styles.th} colSpan={3}>Program 1 Status</th>
-                    <th style={styles.th} rowSpan={2}>Program 2</th>
-                    <th style={styles.th} colSpan={3}>Program 2 Status</th>
-                  </tr>
-                  <tr>
-                    {[
-                      'Full 1', 'Partial 1', 'Nil 1',
-                      'Full 2', 'Partial 2', 'Nil 2'
-                    ].map(heading => (
-                      <th key={heading} style={styles.th}>{heading}</th>
-                    ))}
+                    <th style={styles.th}>Mentor</th>
+                    <th style={styles.th}>Program</th>
+                    <th style={styles.th}>Total Learners</th>
+                    <th style={styles.th}>Full</th>
+                    <th style={styles.th}>Partial</th>
+                    <th style={styles.th}>Nil</th>
+                    <th style={styles.th}>Full %</th>
+                    <th style={styles.th}>Full + Partial %</th>
                   </tr>
                 </thead>
+
                 <tbody>
                   {mentorProgramSummary.map((row, index) => (
-                    <tr key={`${row.mentor}-${index}`}>
-                      <td style={styles.td}>{row.mentor}</td>
-                      <td style={styles.td}>{textValue(row.program1)}</td>
-                      <td style={styles.td}>{number(row.full1)}</td>
-                      <td style={styles.td}>{number(row.partial1)}</td>
-                      <td style={styles.td}>{number(row.nil1)}</td>
-                      <td style={styles.td}>{textValue(row.program2)}</td>
-                      <td style={styles.td}>{number(row.full2)}</td>
-                      <td style={styles.td}>{number(row.partial2)}</td>
-                      <td style={styles.td}>{number(row.nil2)}</td>
+                    <tr
+                      key={`${row.mentor}-${row.program}-${index}`}
+                    >
+                      <td style={styles.td}>{textValue(row.mentor)}</td>
+                      <td style={styles.td}>{textValue(row.program)}</td>
+                      <td style={styles.td}>{number(row.totalLearners)}</td>
+                      <td style={styles.td}>{number(row.full)}</td>
+                      <td style={styles.td}>{number(row.partial)}</td>
+                      <td style={styles.td}>{number(row.nil)}</td>
+                      <td style={styles.td}>{percent(row.fullPercent)}</td>
+                      <td style={styles.td}>
+                        {percent(row.fullPartialPercent)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -702,8 +698,14 @@ export default function Dashboard() {
                 <thead>
                   <tr>
                     {[
-                      'Mentor', 'Sales Type', 'Total Learners',
-                      'Full', 'Partial', 'Nil', 'Full %', 'Full + Partial %'
+                      'Mentor',
+                      'Sales Type',
+                      'Total Learners',
+                      'Full',
+                      'Partial',
+                      'Nil',
+                      'Full %',
+                      'Full + Partial %'
                     ].map(heading => (
                       <th key={heading} style={styles.th}>{heading}</th>
                     ))}
@@ -766,7 +768,10 @@ export default function Dashboard() {
         <section style={styles.panel}>
           <h2 style={styles.sectionTitle}>Program-wise Summary</h2>
           <SummaryTable
-            rows={data?.programSummary || []}
+            rows={(data?.programSummary || []).map(row => ({
+              ...row,
+              name: row.program
+            }))}
             firstColumn="Program"
             columns={[
               { key: 'totalLearners', label: 'Total Learners' },
@@ -788,10 +793,7 @@ export default function Dashboard() {
           <SummaryTable
             rows={(data?.salesSummary || []).map(row => ({
               ...row,
-              name: row.name,
-              full: row.full,
-              partial: row.partial,
-              nil: row.nil
+              name: row.name
             }))}
             firstColumn="Sales Type"
             columns={[
@@ -808,10 +810,7 @@ export default function Dashboard() {
           <SummaryTable
             rows={(data?.mentorSummary || []).map(row => ({
               ...row,
-              name: row.name,
-              full: row.full,
-              partial: row.partial,
-              nil: row.nil
+              name: row.name
             }))}
             firstColumn="Mentor"
             columns={[
