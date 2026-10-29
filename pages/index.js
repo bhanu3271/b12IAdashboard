@@ -1,12 +1,11 @@
-
 import { useCallback, useEffect, useState } from 'react';
 
 const initialKpis = {
   totalLearners: 0,
   fullySubmitted: 0,
   partiallySubmitted: 0,
-  notSubmitted: 0,
-  averageSubmission: 0
+  nilSubmission: 0,
+  pendingSubjectCount: 0
 };
 
 const styles = {
@@ -120,42 +119,38 @@ const styles = {
 };
 
 function number(value) {
-  const parsed = Number(value);
-
-  return value !== null &&
-    value !== undefined &&
-    value !== '' &&
-    Number.isFinite(parsed)
-    ? parsed.toLocaleString('en-IN')
-    : '0';
+  const n = Number(value);
+  return Number.isFinite(n) ? n.toLocaleString('en-IN') : '0';
 }
 
 function percent(value) {
-  const parsed = Number(value);
+  if (value === null || value === undefined || value === '') return '—';
+  const n = Number(value);
+  return Number.isFinite(n) ? `${n.toFixed(1)}%` : '—';
+}
 
-  return value !== null &&
-    value !== undefined &&
-    value !== '' &&
-    Number.isFinite(parsed)
-    ? `${parsed.toFixed(1)}%`
-    : '0.0%';
+function changePercent(value) {
+  if (value === null || value === undefined || value === '') {
+    return 'No baseline';
+  }
+
+  const n = Number(value);
+  return `${n > 0 ? '+' : ''}${n.toFixed(1)} pp`;
 }
 
 function textValue(value) {
-  return value === null ||
-    value === undefined ||
-    String(value).trim() === ''
+  return value === null || value === undefined || String(value).trim() === ''
     ? '—'
     : String(value);
 }
 
 function getPendingSubjectCodes(row) {
-  const value =
+  return String(
     row?.pendingSubjectCodes ??
     row?.pendingSubjects ??
-    '';
-
-  return String(value || '').trim();
+    row?.pendingCourseCode ??
+    ''
+  ).trim();
 }
 
 function SummaryTable({ rows, firstColumn, columns }) {
@@ -180,35 +175,21 @@ function SummaryTable({ rows, firstColumn, columns }) {
             ))}
           </tr>
         </thead>
-
         <tbody>
           {rows.map((row, index) => (
-            <tr
-              key={`${row.name || row.mentor || row.salesType || 'row'}-${index}`}
-            >
+            <tr key={`${row.name || row.mentor || row.salesType || 'row'}-${index}`}>
               <td style={styles.td}>
                 {textValue(row.name || row.mentor || row.salesType)}
               </td>
-
-              {columns.map(column => {
-                const value = row[column.key];
-
-                let displayedValue;
-
-                if (column.format) {
-                  displayedValue = column.format(value, row);
-                } else if (column.type === 'text') {
-                  displayedValue = textValue(value);
-                } else {
-                  displayedValue = number(value);
-                }
-
-                return (
-                  <td key={column.key} style={styles.td}>
-                    {displayedValue}
-                  </td>
-                );
-              })}
+              {columns.map(column => (
+                <td key={column.key} style={styles.td}>
+                  {column.format
+                    ? column.format(row[column.key], row)
+                    : column.type === 'text'
+                      ? textValue(row[column.key])
+                      : number(row[column.key])}
+                </td>
+              ))}
             </tr>
           ))}
         </tbody>
@@ -222,11 +203,7 @@ function prepareMentorProgramSummary(rows) {
 
   (rows || []).forEach(row => {
     const mentor = row.mentor || 'Unassigned';
-
-    if (!grouped[mentor]) {
-      grouped[mentor] = [];
-    }
-
+    if (!grouped[mentor]) grouped[mentor] = [];
     grouped[mentor].push(row);
   });
 
@@ -245,13 +222,13 @@ function prepareMentorProgramSummary(rows) {
       return {
         mentor,
         program1: first.program || '',
-        full1: first.fullySubmitted || 0,
-        partial1: first.partiallySubmitted || 0,
-        nil1: first.notSubmitted || 0,
+        full1: first.full || 0,
+        partial1: first.partial || 0,
+        nil1: first.nil || 0,
         program2: second.program || '',
-        full2: second.fullySubmitted || 0,
-        partial2: second.partiallySubmitted || 0,
-        nil2: second.notSubmitted || 0
+        full2: second.full || 0,
+        partial2: second.partial || 0,
+        nil2: second.nil || 0
       };
     });
 }
@@ -266,28 +243,42 @@ function downloadCsv(rows) {
     'Roll No.',
     'Program',
     'Mentor',
-    'Pending Subjects'
+    'Pending Subject Count',
+    'Pending Course Codes'
   ];
 
-  const csvCell = value => {
-    const text = String(value == null ? '' : value);
-    return `"${text.replace(/"/g, '""')}"`;
-  };
+  const csvCell = value =>
+    `"${String(value == null ? '' : value).replace(/"/g, '""')}"`;
 
   const lines = [
     headers.map(csvCell).join(','),
-    ...rows.map(row => [
-      row.rollNo,
-      row.program,
-      row.mentor,
-      getPendingSubjectCodes(row)
-    ].map(csvCell).join(','))
+    ...rows.map(row => {
+      const codes = getPendingSubjectCodes(row);
+
+      const codeList = codes
+        ? codes.split(/[,;\n|]+/).map(code => code.trim()).filter(Boolean)
+        : [];
+
+      const count =
+        row.pendingSubjectCount !== null &&
+        row.pendingSubjectCount !== undefined
+          ? Number(row.pendingSubjectCount)
+          : new Set(codeList).size;
+
+      return [
+        row.rollNo,
+        row.program,
+        row.mentor,
+        count,
+        codes
+      ].map(csvCell).join(',');
+    })
   ];
 
-  const csvContent = '\uFEFF' + lines.join('\r\n');
-  const blob = new Blob([csvContent], {
-    type: 'text/csv;charset=utf-8;'
-  });
+  const blob = new Blob(
+    ['\uFEFF' + lines.join('\r\n')],
+    { type: 'text/csv;charset=utf-8;' }
+  );
 
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -361,13 +352,11 @@ export default function Dashboard() {
 
       setData(json);
     } catch (err) {
-      if (err.name === 'AbortError') {
-        setError(
-          'The dashboard request took longer than 60 seconds. Please retry. If this continues, the API response may be too slow or too large.'
-        );
-      } else {
-        setError(err.message || 'Unable to load dashboard data.');
-      }
+      setError(
+        err.name === 'AbortError'
+          ? 'The dashboard request took longer than 60 seconds. Please retry.'
+          : err.message || 'Unable to load dashboard data.'
+      );
     } finally {
       clearTimeout(timeoutId);
       setLoading(false);
@@ -380,27 +369,25 @@ export default function Dashboard() {
 
   const kpis = data?.kpis || initialKpis;
   const pendingLearners = data?.pendingLearners || [];
-  const mentorSalesSummary = data?.mentorSalesSummary || [];
-
   const mentorProgramSummary = prepareMentorProgramSummary(
     data?.mentorProgramSummary || []
   );
-
-  const totalLearners = Number(kpis.totalLearners || 0);
-
-  const fullCount = Number(
-    kpis.fullySubmitted ?? kpis.full ?? 0
-  );
-
-  const fullRate = totalLearners
-    ? (fullCount / totalLearners) * 100
-    : 0;
+  const mentorSalesSummary = data?.mentorSalesSummary || [];
 
   function resetFilters() {
     setProgram('');
     setSalesType('');
     setMentor('');
   }
+
+  const statusItems = data?.statusSummary || [];
+  const comparisonMap = {};
+
+  (data?.yesterdayComparison?.byProgram || []).forEach(row => {
+    comparisonMap[`${row.program}||${row.salesType}`] = row;
+  });
+
+  const programmeSummary = data?.programSummary || [];
 
   return (
     <main style={styles.page}>
@@ -415,7 +402,7 @@ export default function Dashboard() {
         {error && (
           <div style={styles.error}>
             <strong>Unable to load dashboard:</strong> {error}
-            <div style={{ marginTop: '9px' }}>
+            <div style={{ marginTop: 9 }}>
               <button
                 style={styles.button}
                 onClick={load}
@@ -434,7 +421,7 @@ export default function Dashboard() {
             style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-              gap: '12px',
+              gap: 12,
               alignItems: 'end'
             }}
           >
@@ -446,8 +433,8 @@ export default function Dashboard() {
                 onChange={event => setProgram(event.target.value)}
               >
                 <option value="">All Programs</option>
-                {(data?.filters?.programs || []).map(item => (
-                  <option key={item} value={item}>{item}</option>
+                {(data?.filters?.programs || []).map(value => (
+                  <option key={value} value={value}>{value}</option>
                 ))}
               </select>
             </div>
@@ -460,8 +447,8 @@ export default function Dashboard() {
                 onChange={event => setSalesType(event.target.value)}
               >
                 <option value="">All Sales Types</option>
-                {(data?.filters?.salesTypes || []).map(item => (
-                  <option key={item} value={item}>{item}</option>
+                {(data?.filters?.salesTypes || []).map(value => (
+                  <option key={value} value={value}>{value}</option>
                 ))}
               </select>
             </div>
@@ -474,13 +461,13 @@ export default function Dashboard() {
                 onChange={event => setMentor(event.target.value)}
               >
                 <option value="">All Mentors</option>
-                {(data?.filters?.mentors || []).map(item => (
-                  <option key={item} value={item}>{item}</option>
+                {(data?.filters?.mentors || []).map(value => (
+                  <option key={value} value={value}>{value}</option>
                 ))}
               </select>
             </div>
 
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button
                 style={styles.button}
                 onClick={resetFilters}
@@ -488,6 +475,7 @@ export default function Dashboard() {
               >
                 Clear Filters
               </button>
+
               <button
                 style={styles.button}
                 onClick={load}
@@ -499,7 +487,7 @@ export default function Dashboard() {
           </div>
 
           {loading && (
-            <p style={{ ...styles.muted, marginTop: '10px' }}>
+            <p style={{ ...styles.muted, marginTop: 10 }}>
               Loading dashboard data…
             </p>
           )}
@@ -508,24 +496,106 @@ export default function Dashboard() {
         <section style={styles.grid}>
           {[
             ['Total Learners', number(kpis.totalLearners)],
-            ['Fully Submitted', number(kpis.fullySubmitted ?? kpis.full)],
-            ['Partial Submission', number(kpis.partiallySubmitted ?? kpis.partial)],
-            ['Nil Submission', number(kpis.notSubmitted ?? kpis.nil)],
-            ['Average Submission', percent(kpis.averageSubmission ?? kpis.avgSubmission)],
-            ['Full Submission Rate', percent(fullRate)]
+            ['Fully Submitted', number(kpis.fullySubmitted)],
+            ['Partial Submission', number(kpis.partiallySubmitted)],
+            ['Nil Submission', number(kpis.nilSubmission)],
+            ['Full Submission Rate', percent(kpis.fullPercent)],
+            ['Full + Partial Rate', percent(kpis.fullPartialPercent)],
+            ['Pending Subjects', number(kpis.pendingSubjectCount)]
           ].map(([label, value]) => (
             <div key={label} style={styles.kpi}>
               <div style={styles.kpiLabel}>{label}</div>
-              <div style={styles.kpiValue}>{loading ? '—' : value}</div>
+              <div style={styles.kpiValue}>
+                {loading ? '—' : value}
+              </div>
             </div>
           ))}
         </section>
 
         <section style={styles.panel}>
+          <h2 style={styles.sectionTitle}>
+            Programme-wise Submission Summary
+          </h2>
+
+          <p style={styles.muted}>
+            Full % = fully submitted learners ÷ total learners.
+            Full + Partial % = learners who submitted at least one subject
+            ÷ total learners. Daily changes are shown in percentage points.
+          </p>
+
+          {!programmeSummary.length ? (
+            <p style={styles.muted}>
+              No programme summary available.
+            </p>
+          ) : (
+            <div style={styles.tableWrap}>
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    {[
+                      'Programme',
+                      'Sales Type',
+                      'Total Learners',
+                      'Target',
+                      'Full',
+                      'Partial',
+                      'Nil',
+                      'Full %',
+                      'Full + Partial %',
+                      'Change in Full %',
+                      'Change in Full + Partial %'
+                    ].map(heading => (
+                      <th key={heading} style={styles.th}>{heading}</th>
+                    ))}
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {programmeSummary.map((row, index) => {
+                    const comparison =
+                      comparisonMap[`${row.program}||${row.salesType}`];
+
+                    return (
+                      <tr key={`${row.program}-${row.salesType}-${index}`}>
+                        <td style={styles.td}>{row.program}</td>
+                        <td style={styles.td}>{row.salesType}</td>
+                        <td style={styles.td}>{number(row.totalLearners)}</td>
+                        <td style={styles.td}>
+                          {row.target == null
+                            ? 'Set target in Apps Script'
+                            : number(row.target)}
+                        </td>
+                        <td style={styles.td}>{number(row.full)}</td>
+                        <td style={styles.td}>{number(row.partial)}</td>
+                        <td style={styles.td}>{number(row.nil)}</td>
+                        <td style={styles.td}>{percent(row.fullPercent)}</td>
+                        <td style={styles.td}>{percent(row.fullPartialPercent)}</td>
+                        <td style={styles.td}>
+                          {changePercent(comparison?.fullPercentChange)}
+                        </td>
+                        <td style={styles.td}>
+                          {changePercent(comparison?.fullPartialPercentChange)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <p style={{ ...styles.muted, marginTop: 10 }}>
+            Snapshot status: {data?.snapshotInfo?.message || 'Status unavailable'}.
+            The first snapshot establishes the baseline. Comparisons become
+            available after a later day's snapshot is saved.
+          </p>
+        </section>
+
+        <section style={styles.panel}>
           <h2 style={styles.sectionTitle}>Submission Status</h2>
 
-          <div style={{ display: 'grid', gap: '12px' }}>
-            {(data?.statusSummary || []).map(item => {
+          <div style={{ display: 'grid', gap: 12 }}>
+            {statusItems.map(item => {
               const total = Number(kpis.totalLearners || 0);
               const width = total
                 ? Math.min(100, Number(item.count || 0) * 100 / total)
@@ -537,19 +607,19 @@ export default function Dashboard() {
                     style={{
                       display: 'flex',
                       justifyContent: 'space-between',
-                      marginBottom: '5px',
-                      fontSize: '11px'
+                      marginBottom: 5,
+                      fontSize: 11
                     }}
                   >
                     <span>{item.status}</span>
-                    <strong>{number(item.count)}</strong>
+                    <strong>{number(item.count)} ({percent(item.percentage)})</strong>
                   </div>
 
                   <div
                     style={{
-                      height: '8px',
+                      height: 8,
                       background: '#e2e8f0',
-                      borderRadius: '5px',
+                      borderRadius: 5,
                       overflow: 'hidden'
                     }}
                   >
@@ -578,8 +648,8 @@ export default function Dashboard() {
             Shows the first two programs alphabetically for each mentor.
           </p>
 
-          {mentorProgramSummary.length === 0 ? (
-            <p style={styles.muted}>No data available for the selected filters.</p>
+          {!mentorProgramSummary.length ? (
+            <p style={styles.muted}>No data available.</p>
           ) : (
             <div style={styles.tableWrap}>
               <table style={styles.table}>
@@ -592,15 +662,14 @@ export default function Dashboard() {
                     <th style={styles.th} colSpan={3}>Program 2 Status</th>
                   </tr>
                   <tr>
-                    <th style={styles.th}>Full 1</th>
-                    <th style={styles.th}>Partial 1</th>
-                    <th style={styles.th}>Nil 1</th>
-                    <th style={styles.th}>Full 2</th>
-                    <th style={styles.th}>Partial 2</th>
-                    <th style={styles.th}>Nil 2</th>
+                    {[
+                      'Full 1', 'Partial 1', 'Nil 1',
+                      'Full 2', 'Partial 2', 'Nil 2'
+                    ].map(heading => (
+                      <th key={heading} style={styles.th}>{heading}</th>
+                    ))}
                   </tr>
                 </thead>
-
                 <tbody>
                   {mentorProgramSummary.map((row, index) => (
                     <tr key={`${row.mentor}-${index}`}>
@@ -623,52 +692,75 @@ export default function Dashboard() {
 
         <section style={styles.panel}>
           <h2 style={styles.sectionTitle}>Mentor-wise Sales Type Summary</h2>
-          <p style={styles.muted}>
-            One row per mentor and sales type. Program is not included in this table.
-          </p>
+          <p style={styles.muted}>One row per mentor and sales type.</p>
 
-          <SummaryTable
-            rows={mentorSalesSummary}
-            firstColumn="Mentor"
-            columns={[
-              { key: 'salesType', label: 'Sales Type', type: 'text' },
-              { key: 'totalLearners', label: 'Total Learners' },
-              { key: 'fullySubmitted', label: 'Full' },
-              { key: 'partiallySubmitted', label: 'Partial' },
-              { key: 'notSubmitted', label: 'Nil' }
-            ]}
-          />
+          {!mentorSalesSummary.length ? (
+            <p style={styles.muted}>No data available.</p>
+          ) : (
+            <div style={styles.tableWrap}>
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    {[
+                      'Mentor', 'Sales Type', 'Total Learners',
+                      'Full', 'Partial', 'Nil', 'Full %', 'Full + Partial %'
+                    ].map(heading => (
+                      <th key={heading} style={styles.th}>{heading}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {mentorSalesSummary.map((row, index) => (
+                    <tr key={`${row.mentor}-${row.salesType}-${index}`}>
+                      <td style={styles.td}>{textValue(row.mentor)}</td>
+                      <td style={styles.td}>{textValue(row.salesType)}</td>
+                      <td style={styles.td}>{number(row.totalLearners)}</td>
+                      <td style={styles.td}>{number(row.full)}</td>
+                      <td style={styles.td}>{number(row.partial)}</td>
+                      <td style={styles.td}>{number(row.nil)}</td>
+                      <td style={styles.td}>{percent(row.fullPercent)}</td>
+                      <td style={styles.td}>{percent(row.fullPartialPercent)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </section>
 
-        {/* Pending Subjects: download button only; table and count removed. */}
         <section style={styles.panel}>
           <div
             style={{
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              gap: '12px',
+              gap: 12,
               flexWrap: 'wrap'
             }}
           >
             <h2 style={{ ...styles.sectionTitle, margin: 0 }}>
-              Partial Submission — Pending Subjects
+              Learners with Pending Subjects
             </h2>
 
             <button
-              style={{
-                ...styles.primaryButton,
-                opacity: pendingLearners.length > 0 && !loading ? 1 : 0.55,
-                cursor: pendingLearners.length > 0 && !loading
-                  ? 'pointer'
-                  : 'not-allowed'
-              }}
-              disabled={pendingLearners.length === 0 || loading}
+              style={styles.primaryButton}
+              disabled={!pendingLearners.length || loading}
               onClick={() => downloadCsv(pendingLearners)}
             >
               Download Pending Subjects (CSV)
             </button>
           </div>
+
+          <p style={{ ...styles.muted, marginTop: 10 }}>
+            The CSV contains roll number, programme, mentor, pending subject
+            count and pending course codes.
+          </p>
+
+          {pendingLearners.length > 0 && (
+            <p style={styles.muted}>
+              Learners with pending subjects: {number(pendingLearners.length)}
+            </p>
+          )}
         </section>
 
         <section style={styles.panel}>
@@ -678,9 +770,15 @@ export default function Dashboard() {
             firstColumn="Program"
             columns={[
               { key: 'totalLearners', label: 'Total Learners' },
-              { key: 'fullySubmitted', label: 'Full' },
-              { key: 'partiallySubmitted', label: 'Partial' },
-              { key: 'notSubmitted', label: 'Nil' }
+              { key: 'full', label: 'Full' },
+              { key: 'partial', label: 'Partial' },
+              { key: 'nil', label: 'Nil' },
+              { key: 'fullPercent', label: 'Full %', format: percent },
+              {
+                key: 'fullPartialPercent',
+                label: 'Full + Partial %',
+                format: percent
+              }
             ]}
           />
         </section>
@@ -688,13 +786,19 @@ export default function Dashboard() {
         <section style={styles.panel}>
           <h2 style={styles.sectionTitle}>Sales Type Summary</h2>
           <SummaryTable
-            rows={data?.salesSummary || []}
+            rows={(data?.salesSummary || []).map(row => ({
+              ...row,
+              name: row.name,
+              full: row.full,
+              partial: row.partial,
+              nil: row.nil
+            }))}
             firstColumn="Sales Type"
             columns={[
               { key: 'totalLearners', label: 'Total Learners' },
-              { key: 'fullySubmitted', label: 'Full' },
-              { key: 'partiallySubmitted', label: 'Partial' },
-              { key: 'notSubmitted', label: 'Nil' }
+              { key: 'full', label: 'Full' },
+              { key: 'partial', label: 'Partial' },
+              { key: 'nil', label: 'Nil' }
             ]}
           />
         </section>
@@ -702,24 +806,24 @@ export default function Dashboard() {
         <section style={styles.panel}>
           <h2 style={styles.sectionTitle}>Mentor-wise Summary</h2>
           <SummaryTable
-            rows={data?.mentorSummary || []}
+            rows={(data?.mentorSummary || []).map(row => ({
+              ...row,
+              name: row.name,
+              full: row.full,
+              partial: row.partial,
+              nil: row.nil
+            }))}
             firstColumn="Mentor"
             columns={[
               { key: 'totalLearners', label: 'Total Learners' },
-              { key: 'fullySubmitted', label: 'Full' },
-              { key: 'partiallySubmitted', label: 'Partial' },
-              { key: 'notSubmitted', label: 'Nil' }
+              { key: 'full', label: 'Full' },
+              { key: 'partial', label: 'Partial' },
+              { key: 'nil', label: 'Nil' }
             ]}
           />
         </section>
 
-        <footer
-          style={{
-            ...styles.muted,
-            textAlign: 'center',
-            padding: '5px'
-          }}
-        >
+        <footer style={{ ...styles.muted, textAlign: 'center', padding: 5 }}>
           IA Submission Dashboard
         </footer>
       </div>
