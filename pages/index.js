@@ -1,4 +1,3 @@
-
 import { useCallback, useEffect, useState } from 'react';
 
 const initialKpis = {
@@ -95,6 +94,19 @@ const styles = {
     padding: '13px',
     minWidth: 0
   },
+  clickableKpi: {
+    background: '#fff',
+    border: '1px solid #e5e7eb',
+    borderRadius: '9px',
+    padding: '13px',
+    minWidth: 0,
+    width: '100%',
+    textAlign: 'left',
+    fontFamily: 'inherit',
+    cursor: 'pointer',
+    color: '#1f2937',
+    transition: 'box-shadow 0.15s ease, border-color 0.15s ease'
+  },
   kpiLabel: {
     color: '#64748b',
     fontSize: '11px',
@@ -105,6 +117,11 @@ const styles = {
     fontWeight: 700,
     lineHeight: 1.2,
     overflowWrap: 'anywhere'
+  },
+  kpiHint: {
+    fontSize: '10px',
+    color: '#64748b',
+    marginTop: '7px'
   },
   tableWrap: {
     width: '100%',
@@ -141,6 +158,15 @@ const styles = {
     padding: '12px',
     borderRadius: '7px',
     marginBottom: '15px',
+    fontSize: '12px'
+  },
+  success: {
+    background: '#f0fdf4',
+    color: '#166534',
+    border: '1px solid #bbf7d0',
+    padding: '10px 12px',
+    borderRadius: '7px',
+    marginBottom: '12px',
     fontSize: '12px'
   }
 };
@@ -200,6 +226,42 @@ function getPendingSubjectCodes(row) {
     row?.pendingCourseCode ??
     ''
   ).trim();
+}
+
+function csvCell(value) {
+  return `"${String(value == null ? '' : value).replace(/"/g, '""')}"`;
+}
+
+function downloadRowsAsCsv(rows, filename, headers) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return false;
+  }
+
+  const lines = [
+    headers.map(csvCell).join(','),
+    ...rows.map(row =>
+      headers.map(header => csvCell(row[header.key])).join(',')
+    )
+  ];
+
+  const blob = new Blob(
+    ['\uFEFF' + lines.join('\r\n')],
+    { type: 'text/csv;charset=utf-8;' }
+  );
+
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+
+  link.href = url;
+  link.download = filename;
+
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+  return true;
 }
 
 function SummaryTable({ rows, firstColumn, columns }) {
@@ -302,73 +364,60 @@ function prepareMentorProgramSummary(rows) {
     });
 }
 
-function downloadCsv(rows) {
+function downloadPendingSubjectsCsv(rows) {
   if (!rows || rows.length === 0) {
     alert('No pending-subject records available to download.');
     return;
   }
 
   const headers = [
-    'Roll No.',
-    'Program',
-    'Mentor',
-    'Pending Subject Count',
-    'Pending Course Codes'
+    { key: 'rollNo', label: 'Roll No.' },
+    { key: 'program', label: 'Program' },
+    { key: 'mentor', label: 'Mentor' },
+    { key: 'pendingSubjectCount', label: 'Pending Subject Count' },
+    { key: 'pendingSubjectCodes', label: 'Pending Course Codes' }
   ];
 
-  const csvCell = value =>
-    `"${String(value == null ? '' : value).replace(/"/g, '""')}"`;
+  const exportRows = rows.map(row => {
+    const codes = getPendingSubjectCodes(row);
 
-  const lines = [
-    headers.map(csvCell).join(','),
+    const count =
+      row.pendingSubjectCount !== null &&
+      row.pendingSubjectCount !== undefined
+        ? Number(row.pendingSubjectCount)
+        : codes
+          ? codes.split(',').map(s => s.trim()).filter(Boolean).length
+          : 0;
 
-    ...rows.map(row => {
-      const codes = getPendingSubjectCodes(row);
+    return {
+      rollNo: row.rollNo,
+      program: row.program,
+      mentor: row.mentor,
+      pendingSubjectCount: count,
+      pendingSubjectCodes: codes
+    };
+  });
 
-      const count =
-        row.pendingSubjectCount !== null &&
-        row.pendingSubjectCount !== undefined
-          ? Number(row.pendingSubjectCount)
-          : codes
-            ? codes.split(',').map(s => s.trim()).filter(Boolean).length
-            : 0;
-
-      return [
-        row.rollNo,
-        row.program,
-        row.mentor,
-        count,
-        codes
-      ].map(csvCell).join(',');
-    })
-  ];
-
-  const blob = new Blob(
-    ['\uFEFF' + lines.join('\r\n')],
-    { type: 'text/csv;charset=utf-8;' }
+  downloadRowsAsCsv(
+    exportRows,
+    'IA_Pending_Subject_Codes.csv',
+    headers
   );
-
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-
-  link.href = url;
-  link.download = 'IA_Pending_Subject_Codes.csv';
-
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 export default function Dashboard() {
   const [data, setData] = useState(null);
+
   const [program, setProgram] = useState('');
   const [salesType, setSalesType] = useState('');
   const [mentor, setMentor] = useState('');
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  const [downloadingStatus, setDownloadingStatus] = useState('');
+  const [downloadError, setDownloadError] = useState('');
+  const [downloadMessage, setDownloadMessage] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -451,7 +500,152 @@ export default function Dashboard() {
     load();
   }, [load]);
 
+  /*
+   * Downloads Full, Partial, or Nil learners from the public API.
+   * The selected Program, Sales Type, and Mentor filters are passed
+   * to the API so the CSV matches the dashboard filters.
+   */
+  const downloadSubmissionStatus = useCallback(async status => {
+    if (downloadingStatus) {
+      return;
+    }
+
+    setDownloadingStatus(status);
+    setDownloadError('');
+    setDownloadMessage('');
+
+    const controller = new AbortController();
+
+    const timeoutId = setTimeout(
+      () => controller.abort(),
+      60000
+    );
+
+    try {
+      const params = new URLSearchParams();
+
+      params.set('status', status);
+
+      if (program) {
+        params.set('program', program);
+      }
+
+      if (salesType) {
+        params.set('salesType', salesType);
+      }
+
+      if (mentor) {
+        params.set('mentor', mentor);
+      }
+
+      params.set('_refresh', String(Date.now()));
+
+      const response = await fetch(
+        `/api/download-submissions?${params.toString()}`,
+        {
+          method: 'GET',
+          cache: 'no-store',
+          signal: controller.signal,
+          headers: {
+            Accept: 'text/csv, application/json'
+          }
+        }
+      );
+
+      const contentType = response.headers.get('content-type') || '';
+
+      if (!response.ok) {
+        const errorText = await response.text();
+
+        let message = `Download failed with HTTP ${response.status}.`;
+
+        try {
+          const json = JSON.parse(errorText);
+          message = json.error || message;
+        } catch {
+          if (errorText.trim()) {
+            message = errorText.slice(0, 400);
+          }
+        }
+
+        throw new Error(message);
+      }
+
+      /*
+       * Support either a CSV response or a JSON response containing rows.
+       * This allows the API route to return CSV directly or JSON records.
+       */
+      if (contentType.includes('application/json')) {
+        const json = await response.json();
+
+        if (json.error) {
+          throw new Error(json.error);
+        }
+
+        const rows = Array.isArray(json.rows) ? json.rows : [];
+
+        const headers = [
+          { key: 'rollNo', label: 'Roll Number' },
+          { key: 'program', label: 'Program' },
+          { key: 'salesType', label: 'Sales Type' },
+          { key: 'mentor', label: 'Mentor' },
+          { key: 'status', label: 'Submission Status' },
+          { key: 'expectedSubjects', label: 'Expected Subjects' },
+          { key: 'submittedSubjects', label: 'Submitted Subjects' },
+          { key: 'submissionPercent', label: 'Submission Percentage' },
+          { key: 'pendingSubjectCodes', label: 'Pending Course Codes' }
+        ];
+
+        if (rows.length === 0) {
+          setDownloadMessage(`No ${status} submission records found for the selected filters.`);
+          return;
+        }
+
+        const filename = `IA_${status}_Submission_Learners.csv`;
+
+        downloadRowsAsCsv(rows, filename, headers);
+
+        setDownloadMessage(
+          `Downloaded ${number(rows.length)} ${status.toLowerCase()} submission records.`
+        );
+      } else {
+        const blob = await response.blob();
+
+        if (blob.size === 0) {
+          setDownloadMessage(`No ${status} submission records found for the selected filters.`);
+          return;
+        }
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+
+        link.href = url;
+        link.download = `IA_${status}_Submission_Learners.csv`;
+
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+        setDownloadMessage(
+          `${status} submission CSV downloaded successfully.`
+        );
+      }
+    } catch (err) {
+      setDownloadError(
+        err.name === 'AbortError'
+          ? 'The download took longer than 60 seconds. Please try again.'
+          : (err.message || 'Unable to download submission records.')
+      );
+    } finally {
+      clearTimeout(timeoutId);
+      setDownloadingStatus('');
+    }
+  }, [program, salesType, mentor, downloadingStatus]);
+
   const kpis = data?.kpis || initialKpis;
+
   const pendingLearners = data?.pendingLearners || [];
   const mentorSalesSummary = data?.mentorSalesSummary || [];
 
@@ -479,7 +673,33 @@ export default function Dashboard() {
     setProgram('');
     setSalesType('');
     setMentor('');
+    setDownloadError('');
+    setDownloadMessage('');
   }
+
+  const submissionKpis = [
+    {
+      label: 'Fully Submitted',
+      value: number(kpis.fullySubmitted ?? kpis.full),
+      status: 'Full',
+      hint: 'Click to download Full learners',
+      color: '#16a34a'
+    },
+    {
+      label: 'Partial Submission',
+      value: number(kpis.partiallySubmitted ?? kpis.partial),
+      status: 'Partial',
+      hint: 'Click to download Partial learners',
+      color: '#d97706'
+    },
+    {
+      label: 'Nil Submission',
+      value: number(kpis.notSubmitted ?? kpis.nil),
+      status: 'Nil',
+      hint: 'Click to download Nil learners',
+      color: '#64748b'
+    }
+  ];
 
   return (
     <main style={styles.page}>
@@ -598,22 +818,87 @@ export default function Dashboard() {
 
         {/* KPI CARDS */}
         <section style={styles.grid}>
-          {[
-            ['Total Learners', number(kpis.totalLearners)],
-            ['Fully Submitted', number(kpis.fullySubmitted ?? kpis.full)],
-            ['Partial Submission', number(kpis.partiallySubmitted ?? kpis.partial)],
-            ['Nil Submission', number(kpis.notSubmitted ?? kpis.nil)],
-            ['Average Submission', percent(kpis.averageSubmission ?? kpis.avgSubmission)],
-            ['Full Submission Rate', percent(fullRate)]
-          ].map(([label, value]) => (
-            <div key={label} style={styles.kpi}>
-              <div style={styles.kpiLabel}>{label}</div>
-              <div style={styles.kpiValue}>
-                {loading ? '—' : value}
-              </div>
+          <div style={styles.kpi}>
+            <div style={styles.kpiLabel}>Total Learners</div>
+            <div style={styles.kpiValue}>
+              {loading ? '—' : number(kpis.totalLearners)}
             </div>
-          ))}
+          </div>
+
+          {submissionKpis.map(item => {
+            const isDownloading = downloadingStatus === item.status;
+
+            return (
+              <button
+                key={item.status}
+                type="button"
+                title={item.hint}
+                aria-label={`Download ${item.status} submission learners as CSV`}
+                style={{
+                  ...styles.clickableKpi,
+                  borderTop: `3px solid ${item.color}`,
+                  opacity: loading || Boolean(downloadingStatus) ? 0.65 : 1,
+                  cursor: loading || Boolean(downloadingStatus)
+                    ? 'not-allowed'
+                    : 'pointer'
+                }}
+                disabled={loading || Boolean(downloadingStatus)}
+                onClick={() => downloadSubmissionStatus(item.status)}
+              >
+                <div style={styles.kpiLabel}>{item.label}</div>
+
+                <div style={styles.kpiValue}>
+                  {loading
+                    ? '—'
+                    : isDownloading
+                      ? 'Preparing…'
+                      : item.value}
+                </div>
+
+                <div style={styles.kpiHint}>
+                  {isDownloading ? 'Generating CSV…' : item.hint}
+                </div>
+              </button>
+            );
+          })}
+
+          <div style={styles.kpi}>
+            <div style={styles.kpiLabel}>Average Submission</div>
+            <div style={styles.kpiValue}>
+              {loading
+                ? '—'
+                : percent(kpis.averageSubmission ?? kpis.avgSubmission)}
+            </div>
+          </div>
+
+          <div style={styles.kpi}>
+            <div style={styles.kpiLabel}>Full Submission Rate</div>
+            <div style={styles.kpiValue}>
+              {loading ? '—' : percent(fullRate)}
+            </div>
+          </div>
         </section>
+
+        {downloadError && (
+          <div style={styles.error}>
+            <strong>Download failed:</strong> {downloadError}
+
+            <div style={{ marginTop: 8 }}>
+              <button
+                style={styles.button}
+                onClick={() => setDownloadError('')}
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
+
+        {downloadMessage && (
+          <div style={styles.success}>
+            {downloadMessage}
+          </div>
+        )}
 
         {/* PROGRAMME PERFORMANCE TABLE */}
         <section style={styles.panel}>
@@ -961,7 +1246,7 @@ export default function Dashboard() {
                   : 'not-allowed'
               }}
               disabled={!pendingLearners.length || loading}
-              onClick={() => downloadCsv(pendingLearners)}
+              onClick={() => downloadPendingSubjectsCsv(pendingLearners)}
             >
               Download Pending Subjects (CSV)
             </button>
