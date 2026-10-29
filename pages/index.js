@@ -62,9 +62,9 @@ const styles = {
     background: '#1d4ed8',
     color: '#fff',
     borderRadius: '6px',
-    padding: '9px 12px',
+    padding: '12px 18px',
     cursor: 'pointer',
-    fontSize: '12px',
+    fontSize: '13px',
     fontWeight: 600
   },
   grid: {
@@ -149,12 +149,6 @@ function textValue(value) {
     : String(value);
 }
 
-/*
- * Convert a pending-subject value into readable course codes.
- * Supports comma, semicolon, pipe, or line-break separated values.
- * If the source contains a single value such as "5", it remains "5";
- * actual course codes must be supplied by the source data.
- */
 function getPendingSubjectCodes(row) {
   const value =
     row?.pendingSubjectCodes ??
@@ -646,7 +640,7 @@ export default function Dashboard() {
           />
         </section>
 
-        {/* UPDATED: Actual pending course codes are visible in this table. */}
+        {/* Pending Subjects: download button only; table and count removed. */}
         <section style={styles.panel}>
           <div
             style={{
@@ -657,19 +651,17 @@ export default function Dashboard() {
               flexWrap: 'wrap'
             }}
           >
-            <div>
-              <h2 style={{ ...styles.sectionTitle, marginBottom: '5px' }}>
-                Partial Submission — Pending Subjects
-              </h2>
-              <p style={styles.muted}>
-                {number(pendingLearners.length)} learners match the selected filters.
-              </p>
-            </div>
+            <h2 style={{ ...styles.sectionTitle, margin: 0 }}>
+              Partial Submission — Pending Subjects
+            </h2>
 
             <button
               style={{
                 ...styles.primaryButton,
-                opacity: pendingLearners.length && !loading ? 1 : 0.55
+                opacity: pendingLearners.length > 0 && !loading ? 1 : 0.55,
+                cursor: pendingLearners.length > 0 && !loading
+                  ? 'pointer'
+                  : 'not-allowed'
               }}
               disabled={pendingLearners.length === 0 || loading}
               onClick={() => downloadCsv(pendingLearners)}
@@ -677,50 +669,6 @@ export default function Dashboard() {
               Download Pending Subjects (CSV)
             </button>
           </div>
-
-          <p style={styles.muted}>
-            Displays the pending course codes returned by Apps Script.
-            Learner names and email addresses are excluded.
-          </p>
-
-          {pendingLearners.length === 0 ? (
-            <p style={styles.muted}>
-              No partially submitted learners found for the selected filters.
-            </p>
-          ) : (
-            <div style={styles.tableWrap}>
-              <table style={styles.table}>
-                <thead>
-                  <tr>
-                    <th style={styles.th}>Roll No.</th>
-                    <th style={styles.th}>Program</th>
-                    <th style={styles.th}>Mentor</th>
-                    <th style={styles.th}>Pending Course Codes</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {pendingLearners.map((row, index) => (
-                    <tr key={`${row.rollNo || 'learner'}-${index}`}>
-                      <td style={styles.td}>{textValue(row.rollNo)}</td>
-                      <td style={styles.td}>{textValue(row.program)}</td>
-                      <td style={styles.td}>{textValue(row.mentor)}</td>
-                      <td
-                        style={{
-                          ...styles.td,
-                          whiteSpace: 'normal',
-                          minWidth: '220px',
-                          overflowWrap: 'anywhere'
-                        }}
-                      >
-                        {textValue(getPendingSubjectCodes(row))}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
         </section>
 
         <section style={styles.panel}>
