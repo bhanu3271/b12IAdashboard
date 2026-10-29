@@ -928,12 +928,12 @@ export default function Dashboard() {
                       'B12 IS',
                       'Total Learners',
                       'Target %',
-                      'Full Submission Channel %',
-                      'Full Submission Inside %',
+                      'Full Submission DA %',
+                      'Full Submission IS %',
                       'Overall Full %',
                       'Change in Full %',
-                      'Full + Partial Channel %',
-                      'Full + Partial Inside %',
+                      'Full + Partial DA %',
+                      'Full + Partial IS %',
                       'Overall Full + Partial %',
                       'Change in Full + Partial %'
                     ].map(h => (
@@ -953,8 +953,8 @@ export default function Dashboard() {
                       }
                     >
                       <td style={styles.td}>{r.program}</td>
-                      <td style={styles.td}>{number(r.channelLearners)}</td>
-                      <td style={styles.td}>{number(r.insideLearners)}</td>
+                      <td style={styles.td}>{number(r.DALearners)}</td>
+                      <td style={styles.td}>{number(r.ISLearners)}</td>
                       <td style={styles.td}>{number(r.totalLearners)}</td>
 
                       <td style={styles.td}>
@@ -963,8 +963,8 @@ export default function Dashboard() {
                           : percent(r.targetPercent)}
                       </td>
 
-                      <td style={styles.td}>{percent(r.fullChannelPercent)}</td>
-                      <td style={styles.td}>{percent(r.fullInsidePercent)}</td>
+                      <td style={styles.td}>{percent(r.fullDAPercent)}</td>
+                      <td style={styles.td}>{percent(r.fullISPercent)}</td>
                       <td style={styles.td}>{percent(r.overallFullPercent)}</td>
 
                       <td style={styles.td}>
@@ -972,11 +972,11 @@ export default function Dashboard() {
                       </td>
 
                       <td style={styles.td}>
-                        {percent(r.fullPartialChannelPercent)}
+                        {percent(r.fullPartialDAPercent)}
                       </td>
 
                       <td style={styles.td}>
-                        {percent(r.fullPartialInsidePercent)}
+                        {percent(r.fullPartialISPercent)}
                       </td>
 
                       <td style={styles.td}>
