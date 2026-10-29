@@ -17,7 +17,7 @@ const styles = {
     fontFamily: 'Arial, Helvetica, sans-serif',
     fontSize: '12px'
   },
-  container: { maxWidth: '1500px', margin: '0 auto' },
+  container: { maxWidth: '1600px', margin: '0 auto' },
   title: { fontSize: '22px', margin: '0 0 5px', fontWeight: 700 },
   subtitle: { fontSize: '12px', color: '#64748b', margin: '0 0 20px' },
   panel: {
@@ -80,12 +80,7 @@ const styles = {
     minWidth: 0
   },
   kpiLabel: { color: '#64748b', fontSize: '11px', marginBottom: '8px' },
-  kpiValue: {
-    fontSize: '22px',
-    fontWeight: 700,
-    lineHeight: 1.2,
-    overflowWrap: 'anywhere'
-  },
+  kpiValue: { fontSize: '22px', fontWeight: 700, lineHeight: 1.2 },
   tableWrap: { width: '100%', overflowX: 'auto' },
   table: {
     width: '100%',
@@ -120,41 +115,45 @@ const styles = {
 
 function number(value) {
   const parsed = Number(value);
-
-  return value !== null &&
-    value !== undefined &&
-    value !== '' &&
-    Number.isFinite(parsed)
+  return value !== null && value !== undefined &&
+    value !== '' && Number.isFinite(parsed)
     ? parsed.toLocaleString('en-IN')
     : '0';
 }
 
-function percent(value) {
+function percentage(value) {
   const parsed = Number(value);
-
-  return value !== null &&
-    value !== undefined &&
-    value !== '' &&
-    Number.isFinite(parsed)
-    ? `${parsed.toFixed(1)}%`
-    : '0.0%';
+  return value !== null && value !== undefined &&
+    value !== '' && Number.isFinite(parsed)
+    ? `${parsed.toFixed(2)}%`
+    : '—';
 }
 
 function textValue(value) {
-  return value === null ||
-    value === undefined ||
+  return value === null || value === undefined ||
     String(value).trim() === ''
     ? '—'
     : String(value);
 }
 
 function getPendingSubjectCodes(row) {
-  const value =
+  return String(
     row?.pendingSubjectCodes ??
     row?.pendingSubjects ??
-    '';
+    row?.pendingCourseCode ??
+    ''
+  ).trim();
+}
 
-  return String(value || '').trim();
+function formatChange(value) {
+  if (value === null || value === undefined || value === '') {
+    return 'No previous data';
+  }
+
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '—';
+
+  return `${n > 0 ? '+' : ''}${n.toFixed(2)}%`;
 }
 
 function SummaryTable({ rows, firstColumn, columns }) {
@@ -179,32 +178,30 @@ function SummaryTable({ rows, firstColumn, columns }) {
             ))}
           </tr>
         </thead>
-
         <tbody>
           {rows.map((row, index) => (
-            <tr
-              key={`${row.name || row.mentor || row.salesType || 'row'}-${index}`}
-            >
+            <tr key={`${row.name || row.program || row.mentor || row.salesType || 'row'}-${index}`}>
               <td style={styles.td}>
-                {textValue(row.name || row.mentor || row.salesType)}
+                {textValue(
+                  row.name || row.program || row.mentor || row.salesType
+                )}
               </td>
 
               {columns.map(column => {
                 const value = row[column.key];
-
-                let displayedValue;
+                let output;
 
                 if (column.format) {
-                  displayedValue = column.format(value, row);
+                  output = column.format(value, row);
                 } else if (column.type === 'text') {
-                  displayedValue = textValue(value);
+                  output = textValue(value);
                 } else {
-                  displayedValue = number(value);
+                  output = number(value);
                 }
 
                 return (
                   <td key={column.key} style={styles.td}>
-                    {displayedValue}
+                    {output}
                   </td>
                 );
               })}
@@ -216,71 +213,51 @@ function SummaryTable({ rows, firstColumn, columns }) {
   );
 }
 
-/*
- * Mentor-wise Program Summary
- * Displays up to three programs alphabetically for each mentor.
- * Each program displays Full, Partial and Nil counts.
- */
 function prepareMentorProgramSummary(rows) {
   const grouped = {};
 
   (rows || []).forEach(row => {
-    const mentor = String(row.mentor || 'Unassigned').trim();
+    const mentorName = String(row.mentor || 'Unassigned').trim();
 
-    if (!grouped[mentor]) {
-      grouped[mentor] = [];
-    }
-
-    grouped[mentor].push(row);
+    if (!grouped[mentorName]) grouped[mentorName] = [];
+    grouped[mentorName].push(row);
   });
 
-  return Object.keys(grouped)
-    .sort((a, b) => a.localeCompare(b))
-    .map(mentor => {
-      const programs = grouped[mentor]
-        .slice()
-        .sort((a, b) =>
-          String(a.program || '').localeCompare(
-            String(b.program || ''),
-            undefined,
-            { sensitivity: 'base' }
-          )
-        );
+  return Object.keys(grouped).sort().map(mentorName => {
+    const programs = grouped[mentorName].slice().sort((a, b) =>
+      String(a.program || '').localeCompare(String(b.program || ''))
+    );
 
-      const getProgram = index => {
-        const item = programs[index] || {};
-
-        return {
-          program: item.program || '—',
-          full: Number(item.fullySubmitted || 0),
-          partial: Number(item.partiallySubmitted || 0),
-          nil: Number(item.notSubmitted || 0)
-        };
-      };
-
-      const first = getProgram(0);
-      const second = getProgram(1);
-      const third = getProgram(2);
-
+    const getProgram = index => {
+      const item = programs[index] || {};
       return {
-        mentor,
-
-        program1: first.program,
-        full1: first.full,
-        partial1: first.partial,
-        nil1: first.nil,
-
-        program2: second.program,
-        full2: second.full,
-        partial2: second.partial,
-        nil2: second.nil,
-
-        program3: third.program,
-        full3: third.full,
-        partial3: third.partial,
-        nil3: third.nil
+        program: item.program || '—',
+        full: Number(item.fullySubmitted || 0),
+        partial: Number(item.partiallySubmitted || 0),
+        nil: Number(item.notSubmitted || 0)
       };
-    });
+    };
+
+    const p1 = getProgram(0);
+    const p2 = getProgram(1);
+    const p3 = getProgram(2);
+
+    return {
+      mentor: mentorName,
+      program1: p1.program,
+      full1: p1.full,
+      partial1: p1.partial,
+      nil1: p1.nil,
+      program2: p2.program,
+      full2: p2.full,
+      partial2: p2.partial,
+      nil2: p2.nil,
+      program3: p3.program,
+      full3: p3.full,
+      partial3: p3.partial,
+      nil3: p3.nil
+    };
+  });
 }
 
 function downloadCsv(rows) {
@@ -289,17 +266,10 @@ function downloadCsv(rows) {
     return;
   }
 
-  const headers = [
-    'Roll No.',
-    'Program',
-    'Mentor',
-    'Pending Subjects'
-  ];
+  const headers = ['Roll No.', 'Program', 'Mentor', 'Pending Subjects'];
 
-  const csvCell = value => {
-    const text = String(value == null ? '' : value);
-    return `"${text.replace(/"/g, '""')}"`;
-  };
+  const csvCell = value =>
+    `"${String(value == null ? '' : value).replace(/"/g, '""')}"`;
 
   const lines = [
     headers.map(csvCell).join(','),
@@ -311,8 +281,7 @@ function downloadCsv(rows) {
     ].map(csvCell).join(','))
   ];
 
-  const csvContent = '\uFEFF' + lines.join('\r\n');
-  const blob = new Blob([csvContent], {
+  const blob = new Blob(['\uFEFF' + lines.join('\r\n')], {
     type: 'text/csv;charset=utf-8;'
   });
 
@@ -375,23 +344,19 @@ export default function Dashboard() {
       }
 
       if (!response.ok || json.error) {
-        throw new Error(
-          json.error || `Request failed with HTTP ${response.status}.`
-        );
+        throw new Error(json.error || `Request failed with HTTP ${response.status}.`);
       }
 
       if (!json.kpis || !json.filters) {
         throw new Error(
-          'The API response is missing dashboard data. Check the Apps Script deployment.'
+          'The API response is missing dashboard data. Check your API route and Apps Script deployment.'
         );
       }
 
       setData(json);
     } catch (err) {
       if (err.name === 'AbortError') {
-        setError(
-          'The dashboard request took longer than 60 seconds. Please retry. If this continues, the API response may be too slow or too large.'
-        );
+        setError('The dashboard request took longer than 60 seconds. Please retry.');
       } else {
         setError(err.message || 'Unable to load dashboard data.');
       }
@@ -407,21 +372,13 @@ export default function Dashboard() {
 
   const kpis = data?.kpis || initialKpis;
   const pendingLearners = data?.pendingLearners || [];
-  const mentorSalesSummary = data?.mentorSalesSummary || [];
-
   const mentorProgramSummary = prepareMentorProgramSummary(
     data?.mentorProgramSummary || []
   );
 
   const totalLearners = Number(kpis.totalLearners || 0);
-
-  const fullCount = Number(
-    kpis.fullySubmitted ?? kpis.full ?? 0
-  );
-
-  const fullRate = totalLearners
-    ? (fullCount / totalLearners) * 100
-    : 0;
+  const fullCount = Number(kpis.fullySubmitted ?? kpis.full ?? 0);
+  const fullRate = totalLearners ? fullCount * 100 / totalLearners : 0;
 
   function resetFilters() {
     setProgram('');
@@ -443,11 +400,7 @@ export default function Dashboard() {
           <div style={styles.error}>
             <strong>Unable to load dashboard:</strong> {error}
             <div style={{ marginTop: '9px' }}>
-              <button
-                style={styles.button}
-                onClick={load}
-                disabled={loading}
-              >
+              <button style={styles.button} onClick={load} disabled={loading}>
                 Retry
               </button>
             </div>
@@ -474,9 +427,7 @@ export default function Dashboard() {
               >
                 <option value="">All Programs</option>
                 {(data?.filters?.programs || []).map(item => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
+                  <option key={item} value={item}>{item}</option>
                 ))}
               </select>
             </div>
@@ -490,9 +441,7 @@ export default function Dashboard() {
               >
                 <option value="">All Sales Types</option>
                 {(data?.filters?.salesTypes || []).map(item => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
+                  <option key={item} value={item}>{item}</option>
                 ))}
               </select>
             </div>
@@ -506,27 +455,16 @@ export default function Dashboard() {
               >
                 <option value="">All Mentors</option>
                 {(data?.filters?.mentors || []).map(item => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
+                  <option key={item} value={item}>{item}</option>
                 ))}
               </select>
             </div>
 
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <button
-                style={styles.button}
-                onClick={resetFilters}
-                disabled={loading}
-              >
+              <button style={styles.button} onClick={resetFilters} disabled={loading}>
                 Clear Filters
               </button>
-
-              <button
-                style={styles.button}
-                onClick={load}
-                disabled={loading}
-              >
+              <button style={styles.button} onClick={load} disabled={loading}>
                 {loading ? 'Refreshing…' : 'Refresh Data'}
               </button>
             </div>
@@ -545,14 +483,12 @@ export default function Dashboard() {
             ['Fully Submitted', number(kpis.fullySubmitted ?? kpis.full)],
             ['Partial Submission', number(kpis.partiallySubmitted ?? kpis.partial)],
             ['Nil Submission', number(kpis.notSubmitted ?? kpis.nil)],
-            ['Average Submission', percent(kpis.averageSubmission ?? kpis.avgSubmission)],
-            ['Full Submission Rate', percent(fullRate)]
+            ['Average Submission', percentage(kpis.averageSubmission ?? kpis.avgSubmission)],
+            ['Full Submission Rate', percentage(fullRate)]
           ].map(([label, value]) => (
             <div key={label} style={styles.kpi}>
               <div style={styles.kpiLabel}>{label}</div>
-              <div style={styles.kpiValue}>
-                {loading ? '—' : value}
-              </div>
+              <div style={styles.kpiValue}>{loading ? '—' : value}</div>
             </div>
           ))}
         </section>
@@ -562,9 +498,8 @@ export default function Dashboard() {
 
           <div style={{ display: 'grid', gap: '12px' }}>
             {(data?.statusSummary || []).map(item => {
-              const total = Number(kpis.totalLearners || 0);
-              const width = total
-                ? Math.min(100, Number(item.count || 0) * 100 / total)
+              const width = totalLearners
+                ? Math.min(100, Number(item.count || 0) * 100 / totalLearners)
                 : 0;
 
               return (
@@ -580,7 +515,6 @@ export default function Dashboard() {
                     <span>{item.status}</span>
                     <strong>{number(item.count)}</strong>
                   </div>
-
                   <div
                     style={{
                       height: '8px',
@@ -593,12 +527,11 @@ export default function Dashboard() {
                       style={{
                         width: `${width}%`,
                         height: '100%',
-                        background:
-                          item.status === 'Full'
-                            ? '#16a34a'
-                            : item.status === 'Partial'
-                              ? '#d97706'
-                              : '#64748b'
+                        background: item.status === 'Full'
+                          ? '#16a34a'
+                          : item.status === 'Partial'
+                            ? '#d97706'
+                            : '#64748b'
                       }}
                     />
                   </div>
@@ -608,66 +541,52 @@ export default function Dashboard() {
           </div>
         </section>
 
-        {/* UPDATED: Mentor-wise Program Summary supports three programs. */}
+        {/* Mentor-wise Program Summary: now includes Program 3. */}
         <section style={styles.panel}>
           <h2 style={styles.sectionTitle}>Mentor-wise Program Summary</h2>
-
           <p style={styles.muted}>
-            Shows up to three programs alphabetically for each mentor,
-            with Full, Partial and Nil submission counts.
+            Up to three programs per mentor, with Full, Partial and Nil counts.
           </p>
 
           {mentorProgramSummary.length === 0 ? (
-            <p style={styles.muted}>
-              No data available for the selected filters.
-            </p>
+            <p style={styles.muted}>No data available for the selected filters.</p>
           ) : (
             <div style={styles.tableWrap}>
               <table style={styles.table}>
                 <thead>
                   <tr>
                     <th style={styles.th} rowSpan={2}>Mentor</th>
-
                     <th style={styles.th} rowSpan={2}>Program 1</th>
                     <th style={styles.th} colSpan={3}>Program 1 Status</th>
-
                     <th style={styles.th} rowSpan={2}>Program 2</th>
                     <th style={styles.th} colSpan={3}>Program 2 Status</th>
-
                     <th style={styles.th} rowSpan={2}>Program 3</th>
                     <th style={styles.th} colSpan={3}>Program 3 Status</th>
                   </tr>
-
                   <tr>
                     <th style={styles.th}>Full 1</th>
                     <th style={styles.th}>Partial 1</th>
                     <th style={styles.th}>Nil 1</th>
-
                     <th style={styles.th}>Full 2</th>
                     <th style={styles.th}>Partial 2</th>
                     <th style={styles.th}>Nil 2</th>
-
                     <th style={styles.th}>Full 3</th>
                     <th style={styles.th}>Partial 3</th>
                     <th style={styles.th}>Nil 3</th>
                   </tr>
                 </thead>
-
                 <tbody>
                   {mentorProgramSummary.map((row, index) => (
                     <tr key={`${row.mentor}-${index}`}>
                       <td style={styles.td}>{row.mentor}</td>
-
                       <td style={styles.td}>{textValue(row.program1)}</td>
                       <td style={styles.td}>{number(row.full1)}</td>
                       <td style={styles.td}>{number(row.partial1)}</td>
                       <td style={styles.td}>{number(row.nil1)}</td>
-
                       <td style={styles.td}>{textValue(row.program2)}</td>
                       <td style={styles.td}>{number(row.full2)}</td>
                       <td style={styles.td}>{number(row.partial2)}</td>
                       <td style={styles.td}>{number(row.nil2)}</td>
-
                       <td style={styles.td}>{textValue(row.program3)}</td>
                       <td style={styles.td}>{number(row.full3)}</td>
                       <td style={styles.td}>{number(row.partial3)}</td>
@@ -682,13 +601,8 @@ export default function Dashboard() {
 
         <section style={styles.panel}>
           <h2 style={styles.sectionTitle}>Mentor-wise Sales Type Summary</h2>
-
-          <p style={styles.muted}>
-            One row per mentor and sales type. Program is not included in this table.
-          </p>
-
           <SummaryTable
-            rows={mentorSalesSummary}
+            rows={data?.mentorSalesSummary || []}
             firstColumn="Mentor"
             columns={[
               { key: 'salesType', label: 'Sales Type', type: 'text' },
@@ -700,7 +614,80 @@ export default function Dashboard() {
           />
         </section>
 
-        {/* Pending Subjects: download button only; table and count removed. */}
+        {/* NEW TABLE 1: Programme Submission Summary */}
+        <section style={styles.panel}>
+          <h2 style={styles.sectionTitle}>Programme Submission Summary</h2>
+          <p style={styles.muted}>
+            Full and Full + Partial submission percentages compared with targets
+            and the previous available daily snapshot.
+          </p>
+
+          <SummaryTable
+            rows={data?.programmeSubmissionSummary || []}
+            firstColumn="Programme"
+            columns={[
+              { key: 'salesType', label: 'Sales Type', type: 'text' },
+              { key: 'totalLearners', label: 'Total Learners' },
+              { key: 'fullySubmitted', label: 'Full' },
+              { key: 'partiallySubmitted', label: 'Partial' },
+              { key: 'notSubmitted', label: 'Nil' },
+              { key: 'targetPercent', label: 'Target %', format: percentage },
+              { key: 'fullPercent', label: 'Full %', format: percentage },
+              { key: 'fullPartialPercent', label: 'Full + Partial %', format: percentage },
+              { key: 'changeFullPercent', label: 'Change in Full %', format: formatChange },
+              {
+                key: 'changeFullPartialPercent',
+                label: 'Change in Full + Partial %',
+                format: formatChange
+              },
+              {
+                key: 'previousSnapshotDate',
+                label: 'Previous Snapshot Date',
+                type: 'text'
+              }
+            ]}
+          />
+        </section>
+
+        {/* NEW TABLE 2: Programme Performance Table */}
+        <section style={styles.panel}>
+          <h2 style={styles.sectionTitle}>Programme Performance Table</h2>
+          <p style={styles.muted}>
+            Channel, Inside and overall performance, including Full and
+            Full + Partial submission rates.
+          </p>
+
+          <SummaryTable
+            rows={data?.programmePerformanceTable || []}
+            firstColumn="Programme"
+            columns={[
+              { key: 'channelLearners', label: 'Channel Learners' },
+              { key: 'insideLearners', label: 'Inside Learners' },
+              { key: 'totalLearners', label: 'Total Learners' },
+              { key: 'targetPercent', label: 'Target %', format: percentage },
+              { key: 'fullChannelPercent', label: 'Channel Full %', format: percentage },
+              { key: 'fullInsidePercent', label: 'Inside Full %', format: percentage },
+              { key: 'overallFullPercent', label: 'Overall Full %', format: percentage },
+              {
+                key: 'fullPartialChannelPercent',
+                label: 'Channel Full + Partial %',
+                format: percentage
+              },
+              {
+                key: 'fullPartialInsidePercent',
+                label: 'Inside Full + Partial %',
+                format: percentage
+              },
+              {
+                key: 'overallFullPartialPercent',
+                label: 'Overall Full + Partial %',
+                format: percentage
+              }
+            ]}
+          />
+        </section>
+
+        {/* Pending Subjects: CSV download only. */}
         <section style={styles.panel}>
           <div
             style={{
@@ -714,14 +701,10 @@ export default function Dashboard() {
             <h2 style={{ ...styles.sectionTitle, margin: 0 }}>
               Partial Submission — Pending Subjects
             </h2>
-
             <button
               style={{
                 ...styles.primaryButton,
-                opacity: pendingLearners.length > 0 && !loading ? 1 : 0.55,
-                cursor: pendingLearners.length > 0 && !loading
-                  ? 'pointer'
-                  : 'not-allowed'
+                opacity: pendingLearners.length > 0 && !loading ? 1 : 0.55
               }}
               disabled={pendingLearners.length === 0 || loading}
               onClick={() => downloadCsv(pendingLearners)}
@@ -733,7 +716,6 @@ export default function Dashboard() {
 
         <section style={styles.panel}>
           <h2 style={styles.sectionTitle}>Program-wise Summary</h2>
-
           <SummaryTable
             rows={data?.programSummary || []}
             firstColumn="Program"
@@ -748,7 +730,6 @@ export default function Dashboard() {
 
         <section style={styles.panel}>
           <h2 style={styles.sectionTitle}>Sales Type Summary</h2>
-
           <SummaryTable
             rows={data?.salesSummary || []}
             firstColumn="Sales Type"
@@ -763,7 +744,6 @@ export default function Dashboard() {
 
         <section style={styles.panel}>
           <h2 style={styles.sectionTitle}>Mentor-wise Summary</h2>
-
           <SummaryTable
             rows={data?.mentorSummary || []}
             firstColumn="Mentor"
