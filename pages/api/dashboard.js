@@ -1,4 +1,3 @@
-
 const APPS_SCRIPT_URL =
   'https://script.google.com/macros/s/AKfycbyCDbE7-zLpi8pAMvwhEoLxf6jrqiVbaE_oM60Ffm392KqZ0uA3l1jxtk_pjxyV2A/exec';
 
@@ -10,7 +9,6 @@ export default async function handler(req, res) {
   try {
     const url = new URL(APPS_SCRIPT_URL);
 
-    // Pass dashboard filters to Google Apps Script.
     for (const key of ['program', 'salesType', 'mentor']) {
       const value = req.query[key];
 
@@ -22,7 +20,9 @@ export default async function handler(req, res) {
     const response = await fetch(url.toString(), {
       method: 'GET',
       redirect: 'follow',
-      headers: { Accept: 'application/json' }
+      headers: {
+        Accept: 'application/json'
+      }
     });
 
     if (!response.ok) {
@@ -35,8 +35,6 @@ export default async function handler(req, res) {
       return res.status(502).json({ error: data.error });
     }
 
-    // Keep the existing Apps Script response and add course-code data
-    // only if Apps Script returns it.
     res.setHeader(
       'Cache-Control',
       's-maxage=60, stale-while-revalidate=120'
