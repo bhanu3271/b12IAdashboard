@@ -168,11 +168,6 @@ function textValue(value) {
     String(value).trim() === '' ? '—' : String(value);
 }
 
-/*
- * Read the first available field name.
- * This allows the frontend to support both old and new Apps Script
- * property names without showing zero merely because of capitalization.
- */
 function getField(row, ...keys) {
   for (const key of keys) {
     if (
@@ -339,7 +334,6 @@ function downloadPendingSubjectsCsv(rows) {
 
   downloadRowsAsCsv(exportRows, 'IA_Pending_Subject_Codes.csv', headers);
 }
-
 export default function Dashboard() {
   const [data, setData] = useState(null);
   const [program, setProgram] = useState('');
@@ -458,7 +452,22 @@ export default function Dashboard() {
         const json = await response.json();
         if (json.error) throw new Error(json.error);
 
-        const rows = Array.isArray(json.rows) ? json.rows : [];
+        const rows = (Array.isArray(json.rows) ? json.rows : []).map(row => {
+          const codes = getPendingSubjectCodes(row);
+          const count = row.pendingSubjectCount !== null &&
+            row.pendingSubjectCount !== undefined
+              ? Number(row.pendingSubjectCount)
+              : codes
+                ? codes.split(',').map(code => code.trim()).filter(Boolean).length
+                : 0;
+
+          return {
+            ...row,
+            pendingSubjectCount: count,
+            pendingSubjectCodes: codes
+          };
+        });
+
         const headers = [
           { key: 'rollNo', label: 'Roll Number' },
           { key: 'program', label: 'Program' },
@@ -468,7 +477,8 @@ export default function Dashboard() {
           { key: 'expectedSubjects', label: 'Expected Subjects' },
           { key: 'submittedSubjects', label: 'Submitted Subjects' },
           { key: 'submissionPercent', label: 'Submission Percentage' },
-          { key: 'pendingSubjectCodes', label: 'Pending Course Codes' }
+          { key: 'pendingSubjectCount', label: 'Pending Subject Count' },
+          { key: 'pendingSubjectCodes', label: 'Pending Subject Codes' }
         ];
 
         if (rows.length === 0) {
@@ -567,8 +577,7 @@ export default function Dashboard() {
             Internal Assessment submission tracking and mentor-wise analysis
           </p>
         </header>
-
-        {error && (
+          {error && (
           <div style={styles.error}>
             <strong>Unable to load dashboard:</strong> {error}
             <div style={{ marginTop: 9 }}>
@@ -763,10 +772,6 @@ export default function Dashboard() {
 
                 <tbody>
                   {programmePerformanceTable.map((r, i) => {
-                    /*
-                     * These aliases match the field names returned by Code.gs.
-                     * The fallback names preserve compatibility with older APIs.
-                     */
                     const daLearners = getField(
                       r, 'daLearners', 'DALearners', 'channelLearners'
                     );
@@ -774,7 +779,6 @@ export default function Dashboard() {
                       r, 'isLearners', 'ISLearners', 'insideLearners'
                     );
                     const total = getField(r, 'totalLearners');
-
                     const target = getField(r, 'targetPercent');
 
                     const daFull = getField(
@@ -784,7 +788,6 @@ export default function Dashboard() {
                       r, 'isFullPercent', 'fullISPercent', 'fullInsidePercent'
                     );
                     const overallFull = getField(r, 'overallFullPercent');
-
                     const fullChange = getField(r, 'changeFullPercent');
 
                     const daFullPartial = getField(
@@ -817,11 +820,9 @@ export default function Dashboard() {
                         <td style={styles.td}>{number(daLearners)}</td>
                         <td style={styles.td}>{number(isLearners)}</td>
                         <td style={styles.td}>{number(total)}</td>
-
                         <td style={styles.td}>
                           {target == null ? '—' : percent(target)}
                         </td>
-
                         <td style={styles.td}>{percent(daFull)}</td>
                         <td style={styles.td}>{percent(isFull)}</td>
                         <td style={styles.td}>{percent(overallFull)}</td>
@@ -838,7 +839,6 @@ export default function Dashboard() {
             </div>
           )}
         </section>
-
         {/* PROGRAMME-WISE SUBMISSION SUMMARY */}
         <section style={styles.panel}>
           <h2 style={styles.sectionTitle}>
