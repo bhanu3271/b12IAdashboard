@@ -168,6 +168,11 @@ function textValue(value) {
     String(value).trim() === '' ? '—' : String(value);
 }
 
+/*
+ * Read the first available field name.
+ * This allows the frontend to support both old and new Apps Script
+ * property names without showing zero merely because of capitalization.
+ */
 function getField(row, ...keys) {
   for (const key of keys) {
     if (
@@ -334,6 +339,7 @@ function downloadPendingSubjectsCsv(rows) {
 
   downloadRowsAsCsv(exportRows, 'IA_Pending_Subject_Codes.csv', headers);
 }
+
 export default function Dashboard() {
   const [data, setData] = useState(null);
   const [program, setProgram] = useState('');
@@ -452,22 +458,7 @@ export default function Dashboard() {
         const json = await response.json();
         if (json.error) throw new Error(json.error);
 
-        const rows = (Array.isArray(json.rows) ? json.rows : []).map(row => {
-          const codes = getPendingSubjectCodes(row);
-          const count = row.pendingSubjectCount !== null &&
-            row.pendingSubjectCount !== undefined
-              ? Number(row.pendingSubjectCount)
-              : codes
-                ? codes.split(',').map(code => code.trim()).filter(Boolean).length
-                : 0;
-
-          return {
-            ...row,
-            pendingSubjectCount: count,
-            pendingSubjectCodes: codes
-          };
-        });
-
+        const rows = Array.isArray(json.rows) ? json.rows : [];
         const headers = [
           { key: 'rollNo', label: 'Roll Number' },
           { key: 'program', label: 'Program' },
@@ -477,8 +468,7 @@ export default function Dashboard() {
           { key: 'expectedSubjects', label: 'Expected Subjects' },
           { key: 'submittedSubjects', label: 'Submitted Subjects' },
           { key: 'submissionPercent', label: 'Submission Percentage' },
-          { key: 'pendingSubjectCount', label: 'Pending Subject Count' },
-          { key: 'pendingSubjectCodes', label: 'Pending Subject Codes' }
+          { key: 'pendingSubjectCodes', label: 'Pending Course Codes' }
         ];
 
         if (rows.length === 0) {
@@ -577,7 +567,8 @@ export default function Dashboard() {
             Internal Assessment submission tracking and mentor-wise analysis
           </p>
         </header>
-          {error && (
+
+        {error && (
           <div style={styles.error}>
             <strong>Unable to load dashboard:</strong> {error}
             <div style={{ marginTop: 9 }}>
@@ -660,12 +651,31 @@ export default function Dashboard() {
 
         {/* KPI CARDS */}
         <section style={styles.grid}>
-          <div style={styles.kpi}>
+          <button
+            type="button"
+            title="Click to download all learners for the selected filters"
+            aria-label="Download all learners as CSV"
+            style={{
+              ...styles.clickableKpi,
+              borderTop: '3px solid #2563eb',
+              opacity: loading || Boolean(downloadingStatus) ? 0.65 : 1,
+              cursor: loading || Boolean(downloadingStatus)
+                ? 'not-allowed'
+                : 'pointer'
+            }}
+            disabled={loading || Boolean(downloadingStatus)}
+            onClick={() => downloadSubmissionStatus('all')}
+          >
             <div style={styles.kpiLabel}>Total Learners</div>
             <div style={styles.kpiValue}>
-              {loading ? '—' : number(kpis.totalLearners)}
+              {loading ? '—' : downloadingStatus === 'all' ? 'Preparing…' : number(kpis.totalLearners)}
             </div>
-          </div>
+            <div style={styles.kpiHint}>
+              {downloadingStatus === 'all'
+                ? 'Generating CSV…'
+                : 'Click to download all learners'}
+            </div>
+          </button>
 
           {submissionKpis.map(item => {
             const isDownloading = downloadingStatus === item.status;
@@ -839,6 +849,7 @@ export default function Dashboard() {
             </div>
           )}
         </section>
+
         {/* PROGRAMME-WISE SUBMISSION SUMMARY */}
         <section style={styles.panel}>
           <h2 style={styles.sectionTitle}>
