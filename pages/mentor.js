@@ -1,241 +1,214 @@
 
-import { useCallback, useEffect, useState } from 'react';
-
-const initialKpis = {
-  totalLearners: 0,
-  fullySubmitted: 0,
-  partiallySubmitted: 0,
-  notSubmitted: 0,
-  averageSubmission: 0
-};
+import { useCallback, useEffect, useState } from "react";
 
 const styles = {
   page: {
-    minHeight: '100vh',
-    background: '#f5f7fb',
-    padding: '22px',
-    color: '#1f2937',
-    fontFamily: 'Arial, Helvetica, sans-serif',
-    fontSize: '12px'
+    minHeight: "100vh",
+    background: "#f5f7fb",
+    padding: "24px",
+    fontFamily: "Arial, sans-serif",
+    color: "#172033",
   },
   container: {
-    maxWidth: '1500px',
-    margin: '0 auto'
+    maxWidth: "1500px",
+    margin: "0 auto",
   },
-  title: {
-    fontSize: '22px',
-    margin: '0 0 5px',
-    fontWeight: 700
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: "14px",
+    marginBottom: "22px",
+  },
+  heading: {
+    margin: 0,
+    fontSize: "25px",
+    fontWeight: 700,
   },
   subtitle: {
-    fontSize: '12px',
-    color: '#64748b',
-    margin: '0 0 20px'
-  },
-  panel: {
-    background: '#fff',
-    border: '1px solid #e5e7eb',
-    borderRadius: '9px',
-    padding: '15px',
-    marginBottom: '16px',
-    boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)'
-  },
-  sectionTitle: {
-    fontSize: '14px',
-    fontWeight: 700,
-    margin: '0 0 13px'
-  },
-  label: {
-    display: 'block',
-    fontSize: '11px',
-    fontWeight: 600,
-    color: '#475569',
-    marginBottom: '5px'
-  },
-  select: {
-    width: '100%',
-    minWidth: 0,
-    padding: '8px 9px',
-    border: '1px solid #cbd5e1',
-    borderRadius: '6px',
-    background: '#fff',
-    fontSize: '12px',
-    color: '#1f2937'
+    color: "#64748b",
+    fontSize: "13px",
+    marginTop: "6px",
   },
   button: {
-    border: '1px solid #cbd5e1',
-    background: '#fff',
-    color: '#334155',
-    borderRadius: '6px',
-    padding: '9px 12px',
-    cursor: 'pointer',
-    fontSize: '12px',
-    fontWeight: 600
+    background: "#2563eb",
+    color: "#fff",
+    border: 0,
+    borderRadius: "7px",
+    padding: "10px 17px",
+    cursor: "pointer",
+    fontSize: "13px",
+    fontWeight: 600,
   },
-  grid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))',
-    gap: '11px',
-    marginBottom: '16px'
+  filterPanel: {
+    background: "#fff",
+    borderRadius: "10px",
+    padding: "16px",
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
+    gap: "14px",
+    marginBottom: "20px",
+    boxShadow: "0 1px 5px rgba(0,0,0,0.05)",
   },
-  kpi: {
-    background: '#fff',
-    border: '1px solid #e5e7eb',
-    borderRadius: '9px',
-    padding: '13px',
-    minWidth: 0
+  filterLabel: {
+    display: "block",
+    fontSize: "12px",
+    fontWeight: 600,
+    color: "#475569",
+    marginBottom: "7px",
+  },
+  select: {
+    width: "100%",
+    padding: "10px",
+    border: "1px solid #dbe1ea",
+    borderRadius: "6px",
+    background: "#fff",
+    fontSize: "13px",
+    color: "#172033",
+  },
+  kpiGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+    gap: "14px",
+    marginBottom: "22px",
+  },
+  kpiCard: {
+    background: "#fff",
+    padding: "17px",
+    borderRadius: "10px",
+    boxShadow: "0 1px 5px rgba(0,0,0,0.05)",
   },
   kpiLabel: {
-    color: '#64748b',
-    fontSize: '11px',
-    marginBottom: '8px'
+    color: "#64748b",
+    fontSize: "12px",
+    marginBottom: "9px",
   },
   kpiValue: {
-    fontSize: '22px',
+    fontSize: "25px",
     fontWeight: 700,
-    lineHeight: 1.2,
-    overflowWrap: 'anywhere'
+    color: "#172033",
+  },
+  section: {
+    background: "#fff",
+    borderRadius: "10px",
+    padding: "17px",
+    marginBottom: "20px",
+    boxShadow: "0 1px 5px rgba(0,0,0,0.05)",
+  },
+  sectionTitle: {
+    fontSize: "16px",
+    fontWeight: 700,
+    margin: "0 0 14px",
   },
   tableWrap: {
-    width: '100%',
-    overflowX: 'auto'
+    width: "100%",
+    overflowX: "auto",
   },
   table: {
-    width: '100%',
-    borderCollapse: 'collapse',
-    fontSize: '11px',
-    whiteSpace: 'nowrap'
+    width: "100%",
+    borderCollapse: "collapse",
+    fontSize: "12px",
+    whiteSpace: "nowrap",
   },
   th: {
-    padding: '9px 10px',
-    background: '#f1f5f9',
-    borderBottom: '1px solid #dbe2ea',
-    textAlign: 'left',
+    background: "#f1f5f9",
+    color: "#475569",
+    padding: "11px 12px",
+    textAlign: "left",
+    borderBottom: "1px solid #e2e8f0",
     fontWeight: 700,
-    color: '#334155'
   },
   td: {
-    padding: '8px 10px',
-    borderBottom: '1px solid #edf0f4',
-    textAlign: 'left'
+    padding: "10px 12px",
+    borderBottom: "1px solid #edf0f5",
+    color: "#334155",
   },
-  muted: {
-    fontSize: '11px',
-    color: '#64748b',
-    lineHeight: 1.5
+  message: {
+    background: "#fff",
+    borderRadius: "8px",
+    padding: "16px",
+    marginBottom: "16px",
+    fontSize: "13px",
   },
-  error: {
-    background: '#fff1f2',
-    color: '#9f1239',
-    border: '1px solid #fecdd3',
-    padding: '12px',
-    borderRadius: '7px',
-    marginBottom: '15px',
-    fontSize: '12px'
-  },
-  sectionHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: '12px',
-    flexWrap: 'wrap',
-    marginBottom: '12px'
-  }
 };
 
 function number(value) {
-  const n = Number(value);
-
-  return value !== null &&
-    value !== undefined &&
-    value !== '' &&
-    Number.isFinite(n)
-      ? n.toLocaleString('en-IN')
-      : '0';
+  if (value === null || value === undefined || value === "") return 0;
+  const parsed = Number(String(value).replace(/,/g, "").replace("%", ""));
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function percent(value) {
-  const n = Number(value);
-
-  return value !== null &&
-    value !== undefined &&
-    value !== '' &&
-    Number.isFinite(n)
-      ? `${n.toFixed(1)}%`
-      : '—';
-}
-
-function textValue(value) {
-  return value === null ||
-    value === undefined ||
-    String(value).trim() === ''
-      ? '—'
-      : String(value);
+function formatNumber(value) {
+  return number(value).toLocaleString("en-IN", {
+    maximumFractionDigits: 2,
+  });
 }
 
 function getField(row, ...keys) {
   for (const key of keys) {
-    if (
-      row &&
-      Object.prototype.hasOwnProperty.call(row, key) &&
-      row[key] !== null &&
-      row[key] !== undefined &&
-      row[key] !== ''
-    ) {
-      return row[key];
+    const value = row?.[key];
+    if (value !== undefined && value !== null && value !== "") {
+      return value;
     }
   }
-
-  return null;
+  return "";
 }
 
-/* Reusable table component */
-function TableSection({ title, rows, columns }) {
+function percentage(value, total) {
+  if (total <= 0) return "0.0%";
+  return `${((number(value) / number(total)) * 100).toFixed(1)}%`;
+}
+
+function TableSection({ title, rows = [], columns = [] }) {
   return (
-    <section style={styles.panel}>
-      <div style={styles.sectionHeader}>
-        <h2 style={styles.sectionTitle}>{title}</h2>
-      </div>
+    <section style={styles.section}>
+      <h2 style={styles.sectionTitle}>{title}</h2>
 
-      {!rows || rows.length === 0 ? (
-        <p style={styles.muted}>
-          No data available for the selected filters.
-        </p>
-      ) : (
-        <div style={styles.tableWrap}>
-          <table style={styles.table}>
-            <thead>
+      <div style={styles.tableWrap}>
+        <table style={styles.table}>
+          <thead>
+            <tr>
+              {columns.map((column) => (
+                <th key={column.label} style={styles.th}>
+                  {column.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+
+          <tbody>
+            {rows.length === 0 ? (
               <tr>
-                {columns.map(column => (
-                  <th key={column.key} style={styles.th}>
-                    {column.label}
-                  </th>
-                ))}
+                <td
+                  colSpan={columns.length}
+                  style={{ ...styles.td, textAlign: "center", padding: "20px" }}
+                >
+                  No data available
+                </td>
               </tr>
-            </thead>
-
-            <tbody>
-              {rows.map((row, index) => (
-                <tr key={`${title}-${index}`}>
-                  {columns.map(column => {
-                    const value = getField(row, ...column.keys);
+            ) : (
+              rows.map((row, index) => (
+                <tr key={index}>
+                  {columns.map((column) => {
+                    const value = column.render
+                      ? column.render(row)
+                      : getField(row, ...column.keys);
 
                     return (
-                      <td key={column.key} style={styles.td}>
-                        {column.format
-                          ? column.format(value, row)
-                          : column.type === 'text'
-                            ? textValue(value)
-                            : number(value)}
+                      <td key={column.label} style={styles.td}>
+                        {value === "" || value === null || value === undefined
+                          ? "-"
+                          : value}
                       </td>
                     );
                   })}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }
@@ -243,493 +216,446 @@ function TableSection({ title, rows, columns }) {
 export default function MentorDashboard() {
   const [data, setData] = useState(null);
 
-  const [program, setProgram] = useState('');
-  const [salesType, setSalesType] = useState('');
-  const [mentor, setMentor] = useState('');
+  const [program, setProgram] = useState("");
+  const [salesType, setSalesType] = useState("");
+  const [mentor, setMentor] = useState("");
 
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
+  const [lastUpdated, setLastUpdated] = useState("");
 
-  /* Load dashboard data */
-  const load = useCallback(async () => {
+  const fetchDashboard = useCallback(async () => {
     setLoading(true);
-    setError('');
-
-    const controller = new AbortController();
-
-    const timeoutId = window.setTimeout(
-      () => controller.abort(),
-      60000
-    );
+    setError("");
 
     try {
       const params = new URLSearchParams();
 
-      if (program) params.set('program', program);
-      if (salesType) params.set('salesType', salesType);
-      if (mentor) params.set('mentor', mentor);
+      if (program) params.set("program", program);
+      if (salesType) params.set("salesType", salesType);
+      if (mentor) params.set("mentor", mentor);
 
-      params.set('_refresh', String(Date.now()));
+      // Unique request parameter prevents reuse of cached responses.
+      params.set("_refresh", Date.now().toString());
 
       const response = await fetch(
         `/api/dashboard?${params.toString()}`,
         {
-          method: 'GET',
-          cache: 'no-store',
-          signal: controller.signal,
+          method: "GET",
+          cache: "no-store",
           headers: {
-            Accept: 'application/json'
-          }
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            Pragma: "no-cache",
+          },
         }
       );
 
-      const responseText = await response.text();
-
-      let json;
-
-      try {
-        json = JSON.parse(responseText);
-      } catch {
-        throw new Error(
-          `The dashboard API returned a non-JSON response. HTTP ${response.status}.`
-        );
+      if (!response.ok) {
+        throw new Error(`API request failed (${response.status})`);
       }
 
-      if (!response.ok || json.error) {
-        throw new Error(
-          json.error ||
-          `Request failed with HTTP ${response.status}.`
-        );
+      const result = await response.json();
+
+      if (result.error) {
+        throw new Error(result.error);
       }
 
-      if (!json.kpis || !json.filters) {
-        throw new Error(
-          'The API response is missing KPI or filter information.'
-        );
-      }
-
-      setData(json);
-
+      setData(result);
+      setLastUpdated(new Date().toLocaleString("en-IN"));
     } catch (err) {
-      setError(
-        err.name === 'AbortError'
-          ? 'Dashboard request timed out. Please retry.'
-          : err.message || 'Unable to load dashboard data.'
-      );
-
+      console.error("Mentor dashboard error:", err);
+      setError(err.message || "Unable to load dashboard data.");
     } finally {
-      window.clearTimeout(timeoutId);
       setLoading(false);
     }
   }, [program, salesType, mentor]);
 
-  /* Reload automatically when filters change */
+  // Load fresh data when the page opens and whenever filters change.
   useEffect(() => {
-    load();
-  }, [load]);
+    fetchDashboard();
+  }, [fetchDashboard]);
 
-  const kpis = data?.kpis || initialKpis;
+  const clearFilters = () => {
+    setProgram("");
+    setSalesType("");
+    setMentor("");
+  };
+
   const filters = data?.filters || {};
 
-  const totalLearners = Number(kpis.totalLearners || 0);
+  const programs = Array.isArray(filters.programs)
+    ? filters.programs
+    : [];
 
-  const fullCount = Number(
-    kpis.fullySubmitted ?? kpis.full ?? 0
+  const salesTypes = Array.isArray(filters.salesTypes)
+    ? filters.salesTypes
+    : [];
+
+  const mentors = Array.isArray(filters.mentors)
+    ? filters.mentors
+    : [];
+
+  const kpis = data?.kpis || {};
+
+  const totalLearners = number(
+    getField(kpis, "totalLearners", "total")
   );
 
-  const fullRate = totalLearners
-    ? (fullCount / totalLearners) * 100
-    : 0;
+  const fullySubmitted = number(
+    getField(kpis, "fullySubmitted", "fullSubmission", "full")
+  );
 
-  /* KPI cards */
-  const kpiCards = [
-    {
-      label: 'Total Learners',
-      value: number(kpis.totalLearners),
-      color: '#2563eb'
-    },
-    {
-      label: 'Fully Submitted',
-      value: number(
-        kpis.fullySubmitted ?? kpis.full
-      ),
-      color: '#16a34a'
-    },
-    {
-      label: 'Partial Submission',
-      value: number(
-        kpis.partiallySubmitted ?? kpis.partial
-      ),
-      color: '#d97706'
-    },
-    {
-      label: 'Nil Submission',
-      value: number(
-        kpis.notSubmitted ?? kpis.nil
-      ),
-      color: '#64748b'
-    },
-    {
-      label: 'Average Submission',
-      value: percent(
-        kpis.averageSubmission ?? kpis.avgSubmission
-      ),
-      color: '#7c3aed'
-    },
-    {
-      label: 'Full Submission Rate',
-      value: percent(fullRate),
-      color: '#0891b2'
-    }
-  ];
+  const partiallySubmitted = number(
+    getField(kpis, "partiallySubmitted", "partialSubmission", "partial")
+  );
 
-  /* TABLE 1: Submission Status */
-  const submissionStatusRows = data?.statusSummary || [];
+  const nilSubmission = number(
+    getField(kpis, "nilSubmission", "notSubmitted", "nil")
+  );
 
-  const submissionStatusColumns = [
-    {
-      key: 'status',
-      label: 'Submission Status',
-      keys: ['status'],
-      type: 'text'
-    },
-    {
-      key: 'count',
-      label: 'Total Learners',
-      keys: ['count', 'totalLearners']
-    },
-    {
-      key: 'percentage',
-      label: 'Percentage',
-      keys: ['percentage', 'percent'],
-      format: (value, row) => {
-        if (value !== null) return percent(value);
+  const averageSubmission = getField(
+    kpis,
+    "averageSubmission",
+    "averageSubmissionPercentage",
+    "average"
+  );
 
-        const count = Number(
-          getField(row, 'count', 'totalLearners') || 0
-        );
+  const fullSubmissionRate = getField(
+    kpis,
+    "fullSubmissionRate",
+    "fullRate"
+  );
 
-        return totalLearners
-          ? percent((count / totalLearners) * 100)
-          : '—';
-      }
-    }
-  ];
+  const statusRows = (data?.statusSummary || []).map((row) => {
+    const count = number(getField(row, "count", "totalLearners"));
+    const suppliedPercentage = getField(
+      row,
+      "percentage",
+      "percent",
+      "submissionPercentage"
+    );
 
-  /* TABLE 2: Mentor-wise Program Summary */
+    return {
+      ...row,
+      displayCount: count,
+      displayPercentage:
+        suppliedPercentage !== ""
+          ? `${number(suppliedPercentage)}%`
+          : percentage(count, totalLearners),
+    };
+  });
+
   const mentorProgramRows = data?.mentorProgramSummary || [];
-
-  const mentorProgramColumns = [
-    {
-      key: 'mentor',
-      label: 'Mentor',
-      keys: ['mentor', 'name'],
-      type: 'text'
-    },
-    {
-      key: 'program',
-      label: 'Program',
-      keys: ['program'],
-      type: 'text'
-    },
-    {
-      key: 'totalLearners',
-      label: 'Total Learners',
-      keys: ['totalLearners']
-    },
-    {
-      key: 'fullySubmitted',
-      label: 'Full',
-      keys: ['fullySubmitted', 'full']
-    },
-    {
-      key: 'partiallySubmitted',
-      label: 'Partial',
-      keys: ['partiallySubmitted', 'partial']
-    },
-    {
-      key: 'notSubmitted',
-      label: 'Nil',
-      keys: ['notSubmitted', 'nil']
-    }
-  ];
-
-  /* TABLE 3: Mentor-wise Sales Type Summary */
   const mentorSalesRows = data?.mentorSalesSummary || [];
-
-  const mentorSalesColumns = [
-    {
-      key: 'mentor',
-      label: 'Mentor',
-      keys: ['mentor', 'name'],
-      type: 'text'
-    },
-    {
-      key: 'salesType',
-      label: 'Sales Type',
-      keys: ['salesType'],
-      type: 'text'
-    },
-    {
-      key: 'totalLearners',
-      label: 'Total Learners',
-      keys: ['totalLearners']
-    },
-    {
-      key: 'fullySubmitted',
-      label: 'Full',
-      keys: ['fullySubmitted', 'full']
-    },
-    {
-      key: 'partiallySubmitted',
-      label: 'Partial',
-      keys: ['partiallySubmitted', 'partial']
-    },
-    {
-      key: 'notSubmitted',
-      label: 'Nil',
-      keys: ['notSubmitted', 'nil']
-    }
-  ];
-
-  /* TABLE 4: Mentor-wise Summary */
-  const mentorSummaryRows = data?.mentorSummary || [];
-
-  const mentorSummaryColumns = [
-    {
-      key: 'mentor',
-      label: 'Mentor',
-      keys: ['mentor', 'name'],
-      type: 'text'
-    },
-    {
-      key: 'totalLearners',
-      label: 'Total Learners',
-      keys: ['totalLearners']
-    },
-    {
-      key: 'fullySubmitted',
-      label: 'Full',
-      keys: ['fullySubmitted', 'full']
-    },
-    {
-      key: 'partiallySubmitted',
-      label: 'Partial',
-      keys: ['partiallySubmitted', 'partial']
-    },
-    {
-      key: 'notSubmitted',
-      label: 'Nil',
-      keys: ['notSubmitted', 'nil']
-    }
-  ];
-
-  /* Clear all filters */
-  function resetFilters() {
-    setProgram('');
-    setSalesType('');
-    setMentor('');
-  }
+  const mentorRows = data?.mentorSummary || [];
 
   return (
     <main style={styles.page}>
       <div style={styles.container}>
+        <header style={styles.header}>
+          <div>
+            <h1 style={styles.heading}>Mentor Dashboard</h1>
+            <div style={styles.subtitle}>
+              IA Submission Performance
+            </div>
+          </div>
 
-        {/* HEADER */}
-        <header>
-          <h1 style={styles.title}>
-            Mentor Dashboard
-          </h1>
-
-          <p style={styles.subtitle}>
-            Internal Assessment submission tracking and mentor-wise reports
-          </p>
+          <button
+            style={{
+              ...styles.button,
+              opacity: loading ? 0.7 : 1,
+            }}
+            onClick={fetchDashboard}
+            disabled={loading}
+          >
+            {loading ? "Refreshing..." : "Refresh Data"}
+          </button>
         </header>
 
-        {/* ERROR MESSAGE */}
-        {error && (
-          <div style={styles.error}>
-            <strong>Unable to load dashboard:</strong> {error}
+        <div style={styles.filterPanel}>
+          <div>
+            <label style={styles.filterLabel}>Program</label>
+            <select
+              style={styles.select}
+              value={program}
+              onChange={(event) => setProgram(event.target.value)}
+            >
+              <option value="">All Programs</option>
+              {programs.map((item, index) => (
+                <option key={index} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </div>
 
-            <div style={{ marginTop: 9 }}>
-              <button
-                style={styles.button}
-                onClick={load}
-                disabled={loading}
-              >
-                Retry
-              </button>
-            </div>
+          <div>
+            <label style={styles.filterLabel}>Sales Type</label>
+            <select
+              style={styles.select}
+              value={salesType}
+              onChange={(event) => setSalesType(event.target.value)}
+            >
+              <option value="">All Sales Types</option>
+              {salesTypes.map((item, index) => (
+                <option key={index} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label style={styles.filterLabel}>Mentor</label>
+            <select
+              style={styles.select}
+              value={mentor}
+              onChange={(event) => setMentor(event.target.value)}
+            >
+              <option value="">All Mentors</option>
+              {mentors.map((item, index) => (
+                <option key={index} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "end" }}>
+            <button
+              style={{
+                ...styles.button,
+                background: "#64748b",
+                width: "100%",
+              }}
+              onClick={clearFilters}
+            >
+              Clear Filters
+            </button>
+          </div>
+        </div>
+
+        {error && (
+          <div
+            style={{
+              ...styles.message,
+              color: "#b91c1c",
+              background: "#fef2f2",
+            }}
+          >
+            {error}
           </div>
         )}
 
-        {/* FILTERS */}
-        <section style={styles.panel}>
-          <h2 style={styles.sectionTitle}>
-            Filters
-          </h2>
+        {loading && !data && (
+          <div style={styles.message}>Loading dashboard data...</div>
+        )}
 
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns:
-                'repeat(auto-fit, minmax(180px, 1fr))',
-              gap: 12,
-              alignItems: 'end'
-            }}
-          >
-            <div>
-              <label style={styles.label}>
-                Program
-              </label>
-
-              <select
-                style={styles.select}
-                value={program}
-                onChange={e => setProgram(e.target.value)}
-              >
-                <option value="">All Programs</option>
-
-                {(filters.programs || []).map(value => (
-                  <option key={value} value={value}>
-                    {value}
-                  </option>
-                ))}
-              </select>
+        {data && (
+          <>
+            <div style={styles.kpiGrid}>
+              {[
+                ["Total Learners", totalLearners],
+                ["Fully Submitted", fullySubmitted],
+                ["Partial Submission", partiallySubmitted],
+                ["Nil Submission", nilSubmission],
+                [
+                  "Average Submission",
+                  typeof averageSubmission === "string" &&
+                  averageSubmission.includes("%")
+                    ? averageSubmission
+                    : `${number(averageSubmission).toFixed(1)}%`,
+                ],
+                [
+                  "Full Submission Rate",
+                  typeof fullSubmissionRate === "string" &&
+                  fullSubmissionRate.includes("%")
+                    ? fullSubmissionRate
+                    : `${number(fullSubmissionRate).toFixed(1)}%`,
+                ],
+              ].map(([label, value]) => (
+                <div key={label} style={styles.kpiCard}>
+                  <div style={styles.kpiLabel}>{label}</div>
+                  <div style={styles.kpiValue}>
+                    {typeof value === "number"
+                      ? formatNumber(value)
+                      : value}
+                  </div>
+                </div>
+              ))}
             </div>
 
-            <div>
-              <label style={styles.label}>
-                Sales Type
-              </label>
+            <TableSection
+              title="Submission Status"
+              rows={statusRows}
+              columns={[
+                {
+                  label: "Submission Status",
+                  keys: ["status", "submissionStatus", "name"],
+                },
+                {
+                  label: "Total Learners",
+                  render: (row) => formatNumber(row.displayCount),
+                },
+                {
+                  label: "Percentage",
+                  render: (row) => row.displayPercentage,
+                },
+              ]}
+            />
 
-              <select
-                style={styles.select}
-                value={salesType}
-                onChange={e => setSalesType(e.target.value)}
-              >
-                <option value="">All Sales Types</option>
+            <TableSection
+              title="Mentor-wise Program Summary"
+              rows={mentorProgramRows}
+              columns={[
+                {
+                  label: "Mentor",
+                  keys: ["mentor", "mentorName", "name"],
+                },
+                {
+                  label: "Program",
+                  keys: ["program", "programName", "academicProgram"],
+                },
+                {
+                  label: "Total Learners",
+                  render: (row) =>
+                    formatNumber(
+                      getField(row, "totalLearners", "total", "count")
+                    ),
+                },
+                {
+                  label: "Full",
+                  render: (row) =>
+                    formatNumber(
+                      getField(row, "full", "fullySubmitted", "fullSubmission")
+                    ),
+                },
+                {
+                  label: "Partial",
+                  render: (row) =>
+                    formatNumber(
+                      getField(
+                        row,
+                        "partial",
+                        "partiallySubmitted",
+                        "partialSubmission"
+                      )
+                    ),
+                },
+                {
+                  label: "Nil",
+                  render: (row) =>
+                    formatNumber(
+                      getField(row, "nil", "nilSubmission", "notSubmitted")
+                    ),
+                },
+              ]}
+            />
 
-                {(filters.salesTypes || []).map(value => (
-                  <option key={value} value={value}>
-                    {value}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <TableSection
+              title="Mentor-wise Sales Type Summary"
+              rows={mentorSalesRows}
+              columns={[
+                {
+                  label: "Mentor",
+                  keys: ["mentor", "mentorName", "name"],
+                },
+                {
+                  label: "Sales Type",
+                  keys: ["salesType", "sales_type", "Sales Type"],
+                },
+                {
+                  label: "Total Learners",
+                  render: (row) =>
+                    formatNumber(
+                      getField(row, "totalLearners", "total", "count")
+                    ),
+                },
+                {
+                  label: "Full",
+                  render: (row) =>
+                    formatNumber(
+                      getField(row, "full", "fullySubmitted", "fullSubmission")
+                    ),
+                },
+                {
+                  label: "Partial",
+                  render: (row) =>
+                    formatNumber(
+                      getField(
+                        row,
+                        "partial",
+                        "partiallySubmitted",
+                        "partialSubmission"
+                      )
+                    ),
+                },
+                {
+                  label: "Nil",
+                  render: (row) =>
+                    formatNumber(
+                      getField(row, "nil", "nilSubmission", "notSubmitted")
+                    ),
+                },
+              ]}
+            />
 
-            <div>
-              <label style={styles.label}>
-                Mentor
-              </label>
-
-              <select
-                style={styles.select}
-                value={mentor}
-                onChange={e => setMentor(e.target.value)}
-              >
-                <option value="">All Mentors</option>
-
-                {(filters.mentors || []).map(value => (
-                  <option key={value} value={value}>
-                    {value}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <TableSection
+              title="Mentor-wise Summary"
+              rows={mentorRows}
+              columns={[
+                {
+                  label: "Mentor",
+                  keys: ["mentor", "mentorName", "name"],
+                },
+                {
+                  label: "Total Learners",
+                  render: (row) =>
+                    formatNumber(
+                      getField(row, "totalLearners", "total", "count")
+                    ),
+                },
+                {
+                  label: "Full",
+                  render: (row) =>
+                    formatNumber(
+                      getField(row, "full", "fullySubmitted", "fullSubmission")
+                    ),
+                },
+                {
+                  label: "Partial",
+                  render: (row) =>
+                    formatNumber(
+                      getField(
+                        row,
+                        "partial",
+                        "partiallySubmitted",
+                        "partialSubmission"
+                      )
+                    ),
+                },
+                {
+                  label: "Nil",
+                  render: (row) =>
+                    formatNumber(
+                      getField(row, "nil", "nilSubmission", "notSubmitted")
+                    ),
+                },
+              ]}
+            />
 
             <div
               style={{
-                display: 'flex',
-                gap: 8,
-                flexWrap: 'wrap'
+                textAlign: "right",
+                color: "#64748b",
+                fontSize: "11px",
+                padding: "4px 2px 14px",
               }}
             >
-              <button
-                style={styles.button}
-                onClick={resetFilters}
-                disabled={loading}
-              >
-                Clear Filters
-              </button>
-
-              <button
-                style={styles.button}
-                onClick={load}
-                disabled={loading}
-              >
-                {loading ? 'Refreshing…' : 'Refresh Data'}
-              </button>
+              Last successful update: {lastUpdated}
             </div>
-          </div>
-
-          {loading && (
-            <p style={{ ...styles.muted, marginTop: 10 }}>
-              Loading dashboard data…
-            </p>
-          )}
-        </section>
-
-        {/* KPI CARDS */}
-        <section style={styles.grid}>
-          {kpiCards.map(item => (
-            <div
-              key={item.label}
-              style={{
-                ...styles.kpi,
-                borderTop: `3px solid ${item.color}`
-              }}
-            >
-              <div style={styles.kpiLabel}>
-                {item.label}
-              </div>
-
-              <div style={styles.kpiValue}>
-                {loading ? '—' : item.value}
-              </div>
-            </div>
-          ))}
-        </section>
-
-        {/* TABLE 1: SUBMISSION STATUS */}
-        <TableSection
-          title="Submission Status"
-          rows={submissionStatusRows}
-          columns={submissionStatusColumns}
-        />
-
-        {/* TABLE 2: MENTOR-WISE PROGRAM SUMMARY */}
-        <TableSection
-          title="Mentor-wise Program Summary"
-          rows={mentorProgramRows}
-          columns={mentorProgramColumns}
-        />
-
-        {/* TABLE 3: MENTOR-WISE SALES TYPE SUMMARY */}
-        <TableSection
-          title="Mentor-wise Sales Type Summary"
-          rows={mentorSalesRows}
-          columns={mentorSalesColumns}
-        />
-
-        {/* TABLE 4: MENTOR-WISE SUMMARY */}
-        <TableSection
-          title="Mentor-wise Summary"
-          rows={mentorSummaryRows}
-          columns={mentorSummaryColumns}
-        />
-
-        {/* FOOTER */}
-        <footer
-          style={{
-            ...styles.muted,
-            textAlign: 'center',
-            padding: 5
-          }}
-        >
-          IA Submission Dashboard — Mentor Portal
-        </footer>
-
+          </>
+        )}
       </div>
     </main>
   );
