@@ -18,9 +18,20 @@ const styles = {
     fontFamily: 'Arial, Helvetica, sans-serif',
     fontSize: '12px'
   },
-  container: { maxWidth: '1500px', margin: '0 auto' },
-  title: { fontSize: '22px', margin: '0 0 5px', fontWeight: 700 },
-  subtitle: { fontSize: '12px', color: '#64748b', margin: '0 0 20px' },
+  container: {
+    maxWidth: '1500px',
+    margin: '0 auto'
+  },
+  title: {
+    fontSize: '22px',
+    margin: '0 0 5px',
+    fontWeight: 700
+  },
+  subtitle: {
+    fontSize: '12px',
+    color: '#64748b',
+    margin: '0 0 20px'
+  },
   panel: {
     background: '#fff',
     border: '1px solid #e5e7eb',
@@ -32,7 +43,7 @@ const styles = {
   sectionTitle: {
     fontSize: '14px',
     fontWeight: 700,
-    margin: 0
+    margin: '0 0 13px'
   },
   label: {
     display: 'block',
@@ -61,16 +72,6 @@ const styles = {
     fontSize: '12px',
     fontWeight: 600
   },
-  downloadButton: {
-    border: '1px solid #1d4ed8',
-    background: '#1d4ed8',
-    color: '#fff',
-    borderRadius: '6px',
-    padding: '8px 12px',
-    cursor: 'pointer',
-    fontSize: '11px',
-    fontWeight: 600
-  },
   grid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))',
@@ -84,9 +85,21 @@ const styles = {
     padding: '13px',
     minWidth: 0
   },
-  kpiLabel: { color: '#64748b', fontSize: '11px', marginBottom: '8px' },
-  kpiValue: { fontSize: '22px', fontWeight: 700, lineHeight: 1.2 },
-  tableWrap: { width: '100%', overflowX: 'auto' },
+  kpiLabel: {
+    color: '#64748b',
+    fontSize: '11px',
+    marginBottom: '8px'
+  },
+  kpiValue: {
+    fontSize: '22px',
+    fontWeight: 700,
+    lineHeight: 1.2,
+    overflowWrap: 'anywhere'
+  },
+  tableWrap: {
+    width: '100%',
+    overflowX: 'auto'
+  },
   table: {
     width: '100%',
     borderCollapse: 'collapse',
@@ -106,7 +119,11 @@ const styles = {
     borderBottom: '1px solid #edf0f4',
     textAlign: 'left'
   },
-  muted: { fontSize: '11px', color: '#64748b', lineHeight: 1.5 },
+  muted: {
+    fontSize: '11px',
+    color: '#64748b',
+    lineHeight: 1.5
+  },
   error: {
     background: '#fff1f2',
     color: '#9f1239',
@@ -114,15 +131,6 @@ const styles = {
     padding: '12px',
     borderRadius: '7px',
     marginBottom: '15px',
-    fontSize: '12px'
-  },
-  success: {
-    background: '#f0fdf4',
-    color: '#166534',
-    border: '1px solid #bbf7d0',
-    padding: '10px 12px',
-    borderRadius: '7px',
-    marginBottom: '12px',
     fontSize: '12px'
   },
   sectionHeader: {
@@ -137,19 +145,32 @@ const styles = {
 
 function number(value) {
   const n = Number(value);
-  return value !== null && value !== undefined && value !== '' &&
-    Number.isFinite(n) ? n.toLocaleString('en-IN') : '0';
+
+  return value !== null &&
+    value !== undefined &&
+    value !== '' &&
+    Number.isFinite(n)
+      ? n.toLocaleString('en-IN')
+      : '0';
 }
 
 function percent(value) {
   const n = Number(value);
-  return value !== null && value !== undefined && value !== '' &&
-    Number.isFinite(n) ? `${n.toFixed(1)}%` : '—';
+
+  return value !== null &&
+    value !== undefined &&
+    value !== '' &&
+    Number.isFinite(n)
+      ? `${n.toFixed(1)}%`
+      : '—';
 }
 
 function textValue(value) {
-  return value === null || value === undefined ||
-    String(value).trim() === '' ? '—' : String(value);
+  return value === null ||
+    value === undefined ||
+    String(value).trim() === ''
+      ? '—'
+      : String(value);
 }
 
 function getField(row, ...keys) {
@@ -164,72 +185,19 @@ function getField(row, ...keys) {
       return row[key];
     }
   }
+
   return null;
 }
 
-function csvCell(value) {
-  return `"${String(value == null ? '' : value).replace(/"/g, '""')}"`;
-}
-
-function downloadRowsAsCsv(rows, filename, headers) {
-  if (!Array.isArray(rows) || rows.length === 0) {
-    return false;
-  }
-
-  const lines = [
-    headers.map(h => csvCell(h.label)).join(','),
-    ...rows.map(row =>
-      headers.map(h => csvCell(row[h.key])).join(',')
-    )
-  ];
-
-  const blob = new Blob(['\uFEFF' + lines.join('\r\n')], {
-    type: 'text/csv;charset=utf-8;'
-  });
-
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-
-  link.href = url;
-  link.download = filename;
-
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-
-  return true;
-}
-
-function TableSection({
-  title,
-  rows,
-  columns,
-  filename,
-  onDownload,
-  loading
-}) {
+/* Reusable table component */
+function TableSection({ title, rows, columns }) {
   return (
     <section style={styles.panel}>
       <div style={styles.sectionHeader}>
         <h2 style={styles.sectionTitle}>{title}</h2>
-
-        <button
-          type="button"
-          style={{
-            ...styles.downloadButton,
-            opacity: loading || !rows.length ? 0.55 : 1,
-            cursor: loading || !rows.length ? 'not-allowed' : 'pointer'
-          }}
-          disabled={loading || !rows.length}
-          onClick={() => onDownload(rows, filename, columns)}
-        >
-          Download CSV
-        </button>
       </div>
 
-      {!rows.length ? (
+      {!rows || rows.length === 0 ? (
         <p style={styles.muted}>
           No data available for the selected filters.
         </p>
@@ -281,16 +249,14 @@ export default function MentorDashboard() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [downloadError, setDownloadError] = useState('');
-  const [downloadMessage, setDownloadMessage] = useState('');
 
+  /* Load dashboard data */
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
-    setDownloadError('');
-    setDownloadMessage('');
 
     const controller = new AbortController();
+
     const timeoutId = window.setTimeout(
       () => controller.abort(),
       60000
@@ -311,11 +277,14 @@ export default function MentorDashboard() {
           method: 'GET',
           cache: 'no-store',
           signal: controller.signal,
-          headers: { Accept: 'application/json' }
+          headers: {
+            Accept: 'application/json'
+          }
         }
       );
 
       const responseText = await response.text();
+
       let json;
 
       try {
@@ -328,7 +297,8 @@ export default function MentorDashboard() {
 
       if (!response.ok || json.error) {
         throw new Error(
-          json.error || `Request failed with HTTP ${response.status}.`
+          json.error ||
+          `Request failed with HTTP ${response.status}.`
         );
       }
 
@@ -339,18 +309,21 @@ export default function MentorDashboard() {
       }
 
       setData(json);
+
     } catch (err) {
       setError(
         err.name === 'AbortError'
           ? 'Dashboard request timed out. Please retry.'
           : err.message || 'Unable to load dashboard data.'
       );
+
     } finally {
       window.clearTimeout(timeoutId);
       setLoading(false);
     }
   }, [program, salesType, mentor]);
 
+  /* Reload automatically when filters change */
   useEffect(() => {
     load();
   }, [load]);
@@ -359,6 +332,7 @@ export default function MentorDashboard() {
   const filters = data?.filters || {};
 
   const totalLearners = Number(kpis.totalLearners || 0);
+
   const fullCount = Number(
     kpis.fullySubmitted ?? kpis.full ?? 0
   );
@@ -367,6 +341,7 @@ export default function MentorDashboard() {
     ? (fullCount / totalLearners) * 100
     : 0;
 
+  /* KPI cards */
   const kpiCards = [
     {
       label: 'Total Learners',
@@ -375,22 +350,30 @@ export default function MentorDashboard() {
     },
     {
       label: 'Fully Submitted',
-      value: number(kpis.fullySubmitted ?? kpis.full),
+      value: number(
+        kpis.fullySubmitted ?? kpis.full
+      ),
       color: '#16a34a'
     },
     {
       label: 'Partial Submission',
-      value: number(kpis.partiallySubmitted ?? kpis.partial),
+      value: number(
+        kpis.partiallySubmitted ?? kpis.partial
+      ),
       color: '#d97706'
     },
     {
       label: 'Nil Submission',
-      value: number(kpis.notSubmitted ?? kpis.nil),
+      value: number(
+        kpis.notSubmitted ?? kpis.nil
+      ),
       color: '#64748b'
     },
     {
       label: 'Average Submission',
-      value: percent(kpis.averageSubmission ?? kpis.avgSubmission),
+      value: percent(
+        kpis.averageSubmission ?? kpis.avgSubmission
+      ),
       color: '#7c3aed'
     },
     {
@@ -400,7 +383,7 @@ export default function MentorDashboard() {
     }
   ];
 
-  // Table 1: Submission Status
+  /* TABLE 1: Submission Status */
   const submissionStatusRows = data?.statusSummary || [];
 
   const submissionStatusColumns = [
@@ -419,11 +402,21 @@ export default function MentorDashboard() {
       key: 'percentage',
       label: 'Percentage',
       keys: ['percentage', 'percent'],
-      format: value => percent(value)
+      format: (value, row) => {
+        if (value !== null) return percent(value);
+
+        const count = Number(
+          getField(row, 'count', 'totalLearners') || 0
+        );
+
+        return totalLearners
+          ? percent((count / totalLearners) * 100)
+          : '—';
+      }
     }
   ];
 
-  // Table 2: Mentor-wise Program Summary
+  /* TABLE 2: Mentor-wise Program Summary */
   const mentorProgramRows = data?.mentorProgramSummary || [];
 
   const mentorProgramColumns = [
@@ -461,7 +454,7 @@ export default function MentorDashboard() {
     }
   ];
 
-  // Table 3: Mentor-wise Sales Type Summary
+  /* TABLE 3: Mentor-wise Sales Type Summary */
   const mentorSalesRows = data?.mentorSalesSummary || [];
 
   const mentorSalesColumns = [
@@ -499,7 +492,7 @@ export default function MentorDashboard() {
     }
   ];
 
-  // Table 4: Mentor-wise Summary
+  /* TABLE 4: Mentor-wise Summary */
   const mentorSummaryRows = data?.mentorSummary || [];
 
   const mentorSummaryColumns = [
@@ -531,38 +524,7 @@ export default function MentorDashboard() {
     }
   ];
 
-  function downloadTable(rows, filename, columns) {
-    setDownloadError('');
-    setDownloadMessage('');
-
-    const csvHeaders = columns.map(column => ({
-      key: column.key,
-      label: column.label
-    }));
-
-    const exportRows = rows.map(row => {
-      const result = {};
-
-      columns.forEach(column => {
-        result[column.key] = getField(row, ...column.keys);
-      });
-
-      return result;
-    });
-
-    const success = downloadRowsAsCsv(
-      exportRows,
-      filename,
-      csvHeaders
-    );
-
-    if (success) {
-      setDownloadMessage(`${filename} downloaded successfully.`);
-    } else {
-      setDownloadMessage('No data available to download.');
-    }
-  }
-
+  /* Clear all filters */
   function resetFilters() {
     setProgram('');
     setSalesType('');
@@ -573,13 +535,18 @@ export default function MentorDashboard() {
     <main style={styles.page}>
       <div style={styles.container}>
 
+        {/* HEADER */}
         <header>
-          <h1 style={styles.title}>Mentor Dashboard</h1>
+          <h1 style={styles.title}>
+            Mentor Dashboard
+          </h1>
+
           <p style={styles.subtitle}>
             Internal Assessment submission tracking and mentor-wise reports
           </p>
         </header>
 
+        {/* ERROR MESSAGE */}
         {error && (
           <div style={styles.error}>
             <strong>Unable to load dashboard:</strong> {error}
@@ -598,59 +565,86 @@ export default function MentorDashboard() {
 
         {/* FILTERS */}
         <section style={styles.panel}>
-          <h2 style={styles.sectionTitle}>Filters</h2>
+          <h2 style={styles.sectionTitle}>
+            Filters
+          </h2>
 
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+              gridTemplateColumns:
+                'repeat(auto-fit, minmax(180px, 1fr))',
               gap: 12,
               alignItems: 'end'
             }}
           >
             <div>
-              <label style={styles.label}>Program</label>
+              <label style={styles.label}>
+                Program
+              </label>
+
               <select
                 style={styles.select}
                 value={program}
                 onChange={e => setProgram(e.target.value)}
               >
                 <option value="">All Programs</option>
+
                 {(filters.programs || []).map(value => (
-                  <option key={value} value={value}>{value}</option>
+                  <option key={value} value={value}>
+                    {value}
+                  </option>
                 ))}
               </select>
             </div>
 
             <div>
-              <label style={styles.label}>Sales Type</label>
+              <label style={styles.label}>
+                Sales Type
+              </label>
+
               <select
                 style={styles.select}
                 value={salesType}
                 onChange={e => setSalesType(e.target.value)}
               >
                 <option value="">All Sales Types</option>
+
                 {(filters.salesTypes || []).map(value => (
-                  <option key={value} value={value}>{value}</option>
+                  <option key={value} value={value}>
+                    {value}
+                  </option>
                 ))}
               </select>
             </div>
 
             <div>
-              <label style={styles.label}>Mentor</label>
+              <label style={styles.label}>
+                Mentor
+              </label>
+
               <select
                 style={styles.select}
                 value={mentor}
                 onChange={e => setMentor(e.target.value)}
               >
                 <option value="">All Mentors</option>
+
                 {(filters.mentors || []).map(value => (
-                  <option key={value} value={value}>{value}</option>
+                  <option key={value} value={value}>
+                    {value}
+                  </option>
                 ))}
               </select>
             </div>
 
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <div
+              style={{
+                display: 'flex',
+                gap: 8,
+                flexWrap: 'wrap'
+              }}
+            >
               <button
                 style={styles.button}
                 onClick={resetFilters}
@@ -686,7 +680,10 @@ export default function MentorDashboard() {
                 borderTop: `3px solid ${item.color}`
               }}
             >
-              <div style={styles.kpiLabel}>{item.label}</div>
+              <div style={styles.kpiLabel}>
+                {item.label}
+              </div>
+
               <div style={styles.kpiValue}>
                 {loading ? '—' : item.value}
               </div>
@@ -694,56 +691,35 @@ export default function MentorDashboard() {
           ))}
         </section>
 
-        {downloadError && (
-          <div style={styles.error}>
-            <strong>Download failed:</strong> {downloadError}
-          </div>
-        )}
-
-        {downloadMessage && (
-          <div style={styles.success}>{downloadMessage}</div>
-        )}
-
-        {/* TABLE 1 */}
+        {/* TABLE 1: SUBMISSION STATUS */}
         <TableSection
           title="Submission Status"
           rows={submissionStatusRows}
           columns={submissionStatusColumns}
-          filename="Submission_Status.csv"
-          onDownload={downloadTable}
-          loading={loading}
         />
 
-        {/* TABLE 2 */}
+        {/* TABLE 2: MENTOR-WISE PROGRAM SUMMARY */}
         <TableSection
           title="Mentor-wise Program Summary"
           rows={mentorProgramRows}
           columns={mentorProgramColumns}
-          filename="Mentor_Wise_Program_Summary.csv"
-          onDownload={downloadTable}
-          loading={loading}
         />
 
-        {/* TABLE 3 */}
+        {/* TABLE 3: MENTOR-WISE SALES TYPE SUMMARY */}
         <TableSection
           title="Mentor-wise Sales Type Summary"
           rows={mentorSalesRows}
           columns={mentorSalesColumns}
-          filename="Mentor_Wise_Sales_Type_Summary.csv"
-          onDownload={downloadTable}
-          loading={loading}
         />
 
-        {/* TABLE 4 */}
+        {/* TABLE 4: MENTOR-WISE SUMMARY */}
         <TableSection
           title="Mentor-wise Summary"
           rows={mentorSummaryRows}
           columns={mentorSummaryColumns}
-          filename="Mentor_Wise_Summary.csv"
-          onDownload={downloadTable}
-          loading={loading}
         />
 
+        {/* FOOTER */}
         <footer
           style={{
             ...styles.muted,
