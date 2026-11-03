@@ -29,7 +29,11 @@ const styles = {
     marginBottom: '16px',
     boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)'
   },
-  sectionTitle: { fontSize: '14px', fontWeight: 700, margin: '0 0 13px' },
+  sectionTitle: {
+    fontSize: '14px',
+    fontWeight: 700,
+    margin: 0
+  },
   label: {
     display: 'block',
     fontSize: '11px',
@@ -57,6 +61,16 @@ const styles = {
     fontSize: '12px',
     fontWeight: 600
   },
+  downloadButton: {
+    border: '1px solid #1d4ed8',
+    background: '#1d4ed8',
+    color: '#fff',
+    borderRadius: '6px',
+    padding: '8px 12px',
+    cursor: 'pointer',
+    fontSize: '11px',
+    fontWeight: 600
+  },
   grid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))',
@@ -72,32 +86,27 @@ const styles = {
   },
   kpiLabel: { color: '#64748b', fontSize: '11px', marginBottom: '8px' },
   kpiValue: { fontSize: '22px', fontWeight: 700, lineHeight: 1.2 },
-  kpiHint: { fontSize: '10px', color: '#64748b', marginTop: '7px' },
-  tileGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-    gap: '15px'
-  },
-  tile: {
-    background: '#fff',
-    border: '1px solid #e5e7eb',
-    borderRadius: '10px',
-    padding: '20px',
-    textAlign: 'left',
-    cursor: 'pointer',
-    color: '#1f2937',
+  tableWrap: { width: '100%', overflowX: 'auto' },
+  table: {
     width: '100%',
-    fontFamily: 'inherit',
-    transition: 'box-shadow 0.15s ease, transform 0.15s ease'
-  },
-  tileTitle: { fontSize: '15px', fontWeight: 700, marginBottom: '9px' },
-  tileDescription: { fontSize: '11px', color: '#64748b', lineHeight: 1.6 },
-  tileAction: {
+    borderCollapse: 'collapse',
     fontSize: '11px',
-    fontWeight: 700,
-    color: '#1d4ed8',
-    marginTop: '16px'
+    whiteSpace: 'nowrap'
   },
+  th: {
+    padding: '9px 10px',
+    background: '#f1f5f9',
+    borderBottom: '1px solid #dbe2ea',
+    textAlign: 'left',
+    fontWeight: 700,
+    color: '#334155'
+  },
+  td: {
+    padding: '8px 10px',
+    borderBottom: '1px solid #edf0f4',
+    textAlign: 'left'
+  },
+  muted: { fontSize: '11px', color: '#64748b', lineHeight: 1.5 },
   error: {
     background: '#fff1f2',
     color: '#9f1239',
@@ -116,24 +125,53 @@ const styles = {
     marginBottom: '12px',
     fontSize: '12px'
   },
-  muted: { fontSize: '11px', color: '#64748b', lineHeight: 1.5 }
+  sectionHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '12px',
+    flexWrap: 'wrap',
+    marginBottom: '12px'
+  }
 };
 
 function number(value) {
   const n = Number(value);
-  return Number.isFinite(n) ? n.toLocaleString('en-IN') : '0';
+  return value !== null && value !== undefined && value !== '' &&
+    Number.isFinite(n) ? n.toLocaleString('en-IN') : '0';
 }
 
 function percent(value) {
   const n = Number(value);
-  return Number.isFinite(n) ? `${n.toFixed(1)}%` : '—';
+  return value !== null && value !== undefined && value !== '' &&
+    Number.isFinite(n) ? `${n.toFixed(1)}%` : '—';
+}
+
+function textValue(value) {
+  return value === null || value === undefined ||
+    String(value).trim() === '' ? '—' : String(value);
+}
+
+function getField(row, ...keys) {
+  for (const key of keys) {
+    if (
+      row &&
+      Object.prototype.hasOwnProperty.call(row, key) &&
+      row[key] !== null &&
+      row[key] !== undefined &&
+      row[key] !== ''
+    ) {
+      return row[key];
+    }
+  }
+  return null;
 }
 
 function csvCell(value) {
   return `"${String(value == null ? '' : value).replace(/"/g, '""')}"`;
 }
 
-function downloadCsv(rows, filename, headers) {
+function downloadRowsAsCsv(rows, filename, headers) {
   if (!Array.isArray(rows) || rows.length === 0) {
     return false;
   }
@@ -164,18 +202,74 @@ function downloadCsv(rows, filename, headers) {
   return true;
 }
 
-function getValue(row, ...keys) {
-  for (const key of keys) {
-    if (
-      row &&
-      row[key] !== undefined &&
-      row[key] !== null &&
-      row[key] !== ''
-    ) {
-      return row[key];
-    }
-  }
-  return '';
+function TableSection({
+  title,
+  rows,
+  columns,
+  filename,
+  onDownload,
+  loading
+}) {
+  return (
+    <section style={styles.panel}>
+      <div style={styles.sectionHeader}>
+        <h2 style={styles.sectionTitle}>{title}</h2>
+
+        <button
+          type="button"
+          style={{
+            ...styles.downloadButton,
+            opacity: loading || !rows.length ? 0.55 : 1,
+            cursor: loading || !rows.length ? 'not-allowed' : 'pointer'
+          }}
+          disabled={loading || !rows.length}
+          onClick={() => onDownload(rows, filename, columns)}
+        >
+          Download CSV
+        </button>
+      </div>
+
+      {!rows.length ? (
+        <p style={styles.muted}>
+          No data available for the selected filters.
+        </p>
+      ) : (
+        <div style={styles.tableWrap}>
+          <table style={styles.table}>
+            <thead>
+              <tr>
+                {columns.map(column => (
+                  <th key={column.key} style={styles.th}>
+                    {column.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+
+            <tbody>
+              {rows.map((row, index) => (
+                <tr key={`${title}-${index}`}>
+                  {columns.map(column => {
+                    const value = getField(row, ...column.keys);
+
+                    return (
+                      <td key={column.key} style={styles.td}>
+                        {column.format
+                          ? column.format(value, row)
+                          : column.type === 'text'
+                            ? textValue(value)
+                            : number(value)}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
 }
 
 export default function MentorDashboard() {
@@ -187,13 +281,14 @@ export default function MentorDashboard() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [downloading, setDownloading] = useState('');
-  const [downloadMessage, setDownloadMessage] = useState('');
   const [downloadError, setDownloadError] = useState('');
+  const [downloadMessage, setDownloadMessage] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
+    setDownloadError('');
+    setDownloadMessage('');
 
     const controller = new AbortController();
     const timeoutId = window.setTimeout(
@@ -221,14 +316,13 @@ export default function MentorDashboard() {
       );
 
       const responseText = await response.text();
-
       let json;
 
       try {
         json = JSON.parse(responseText);
       } catch {
         throw new Error(
-          `Dashboard API returned a non-JSON response. HTTP ${response.status}.`
+          `The dashboard API returned a non-JSON response. HTTP ${response.status}.`
         );
       }
 
@@ -240,7 +334,7 @@ export default function MentorDashboard() {
 
       if (!json.kpis || !json.filters) {
         throw new Error(
-          'Dashboard API response is missing KPI or filter information.'
+          'The API response is missing KPI or filter information.'
         );
       }
 
@@ -249,7 +343,7 @@ export default function MentorDashboard() {
       setError(
         err.name === 'AbortError'
           ? 'Dashboard request timed out. Please retry.'
-          : err.message || 'Unable to load dashboard.'
+          : err.message || 'Unable to load dashboard data.'
       );
     } finally {
       window.clearTimeout(timeoutId);
@@ -261,299 +355,219 @@ export default function MentorDashboard() {
     load();
   }, [load]);
 
+  const kpis = data?.kpis || initialKpis;
   const filters = data?.filters || {};
 
-  const kpis = data?.kpis || initialKpis;
-
+  const totalLearners = Number(kpis.totalLearners || 0);
   const fullCount = Number(
     kpis.fullySubmitted ?? kpis.full ?? 0
   );
-
-  const totalLearners = Number(kpis.totalLearners || 0);
 
   const fullRate = totalLearners
     ? (fullCount / totalLearners) * 100
     : 0;
 
-  const submissionKpis = [
+  const kpiCards = [
     {
       label: 'Total Learners',
-      value: kpis.totalLearners,
+      value: number(kpis.totalLearners),
       color: '#2563eb'
     },
     {
       label: 'Fully Submitted',
-      value: kpis.fullySubmitted ?? kpis.full,
+      value: number(kpis.fullySubmitted ?? kpis.full),
       color: '#16a34a'
     },
     {
       label: 'Partial Submission',
-      value: kpis.partiallySubmitted ?? kpis.partial,
+      value: number(kpis.partiallySubmitted ?? kpis.partial),
       color: '#d97706'
     },
     {
       label: 'Nil Submission',
-      value: kpis.notSubmitted ?? kpis.nil,
+      value: number(kpis.notSubmitted ?? kpis.nil),
       color: '#64748b'
     },
     {
       label: 'Average Submission',
-      value: percent(
-        kpis.averageSubmission ?? kpis.avgSubmission
-      ),
-      color: '#7c3aed',
-      formatted: true
+      value: percent(kpis.averageSubmission ?? kpis.avgSubmission),
+      color: '#7c3aed'
     },
     {
       label: 'Full Submission Rate',
       value: percent(fullRate),
-      color: '#0891b2',
-      formatted: true
+      color: '#0891b2'
     }
   ];
+
+  // Table 1: Submission Status
+  const submissionStatusRows = data?.statusSummary || [];
+
+  const submissionStatusColumns = [
+    {
+      key: 'status',
+      label: 'Submission Status',
+      keys: ['status'],
+      type: 'text'
+    },
+    {
+      key: 'count',
+      label: 'Total Learners',
+      keys: ['count', 'totalLearners']
+    },
+    {
+      key: 'percentage',
+      label: 'Percentage',
+      keys: ['percentage', 'percent'],
+      format: value => percent(value)
+    }
+  ];
+
+  // Table 2: Mentor-wise Program Summary
+  const mentorProgramRows = data?.mentorProgramSummary || [];
+
+  const mentorProgramColumns = [
+    {
+      key: 'mentor',
+      label: 'Mentor',
+      keys: ['mentor', 'name'],
+      type: 'text'
+    },
+    {
+      key: 'program',
+      label: 'Program',
+      keys: ['program'],
+      type: 'text'
+    },
+    {
+      key: 'totalLearners',
+      label: 'Total Learners',
+      keys: ['totalLearners']
+    },
+    {
+      key: 'fullySubmitted',
+      label: 'Full',
+      keys: ['fullySubmitted', 'full']
+    },
+    {
+      key: 'partiallySubmitted',
+      label: 'Partial',
+      keys: ['partiallySubmitted', 'partial']
+    },
+    {
+      key: 'notSubmitted',
+      label: 'Nil',
+      keys: ['notSubmitted', 'nil']
+    }
+  ];
+
+  // Table 3: Mentor-wise Sales Type Summary
+  const mentorSalesRows = data?.mentorSalesSummary || [];
+
+  const mentorSalesColumns = [
+    {
+      key: 'mentor',
+      label: 'Mentor',
+      keys: ['mentor', 'name'],
+      type: 'text'
+    },
+    {
+      key: 'salesType',
+      label: 'Sales Type',
+      keys: ['salesType'],
+      type: 'text'
+    },
+    {
+      key: 'totalLearners',
+      label: 'Total Learners',
+      keys: ['totalLearners']
+    },
+    {
+      key: 'fullySubmitted',
+      label: 'Full',
+      keys: ['fullySubmitted', 'full']
+    },
+    {
+      key: 'partiallySubmitted',
+      label: 'Partial',
+      keys: ['partiallySubmitted', 'partial']
+    },
+    {
+      key: 'notSubmitted',
+      label: 'Nil',
+      keys: ['notSubmitted', 'nil']
+    }
+  ];
+
+  // Table 4: Mentor-wise Summary
+  const mentorSummaryRows = data?.mentorSummary || [];
+
+  const mentorSummaryColumns = [
+    {
+      key: 'mentor',
+      label: 'Mentor',
+      keys: ['mentor', 'name'],
+      type: 'text'
+    },
+    {
+      key: 'totalLearners',
+      label: 'Total Learners',
+      keys: ['totalLearners']
+    },
+    {
+      key: 'fullySubmitted',
+      label: 'Full',
+      keys: ['fullySubmitted', 'full']
+    },
+    {
+      key: 'partiallySubmitted',
+      label: 'Partial',
+      keys: ['partiallySubmitted', 'partial']
+    },
+    {
+      key: 'notSubmitted',
+      label: 'Nil',
+      keys: ['notSubmitted', 'nil']
+    }
+  ];
+
+  function downloadTable(rows, filename, columns) {
+    setDownloadError('');
+    setDownloadMessage('');
+
+    const csvHeaders = columns.map(column => ({
+      key: column.key,
+      label: column.label
+    }));
+
+    const exportRows = rows.map(row => {
+      const result = {};
+
+      columns.forEach(column => {
+        result[column.key] = getField(row, ...column.keys);
+      });
+
+      return result;
+    });
+
+    const success = downloadRowsAsCsv(
+      exportRows,
+      filename,
+      csvHeaders
+    );
+
+    if (success) {
+      setDownloadMessage(`${filename} downloaded successfully.`);
+    } else {
+      setDownloadMessage('No data available to download.');
+    }
+  }
 
   function resetFilters() {
     setProgram('');
     setSalesType('');
     setMentor('');
-    setDownloadMessage('');
-    setDownloadError('');
   }
-
-  async function downloadSubmissionStatus() {
-    if (downloading) return;
-
-    setDownloading('submission');
-    setDownloadError('');
-    setDownloadMessage('');
-
-    const controller = new AbortController();
-    const timeoutId = window.setTimeout(
-      () => controller.abort(),
-      60000
-    );
-
-    try {
-      const params = new URLSearchParams();
-
-      params.set('status', 'all');
-
-      if (program) params.set('program', program);
-      if (salesType) params.set('salesType', salesType);
-      if (mentor) params.set('mentor', mentor);
-
-      params.set('_refresh', String(Date.now()));
-
-      const response = await fetch(
-        `/api/download-submissions?${params.toString()}`,
-        {
-          method: 'GET',
-          cache: 'no-store',
-          signal: controller.signal,
-          headers: { Accept: 'text/csv, application/json' }
-        }
-      );
-
-      if (!response.ok) {
-        const message = await response.text();
-        throw new Error(
-          message || `Download failed. HTTP ${response.status}.`
-        );
-      }
-
-      const contentType = response.headers.get('content-type') || '';
-
-      if (contentType.includes('application/json')) {
-        const json = await response.json();
-
-        if (json.error) throw new Error(json.error);
-
-        const headers = [
-          { key: 'rollNo', label: 'Roll Number' },
-          { key: 'program', label: 'Program' },
-          { key: 'salesType', label: 'Sales Type' },
-          { key: 'mentor', label: 'Mentor' },
-          { key: 'status', label: 'Submission Status' },
-          { key: 'expectedSubjects', label: 'Expected Subjects' },
-          { key: 'submittedSubjects', label: 'Submitted Subjects' },
-          { key: 'submissionPercent', label: 'Submission Percentage' },
-          { key: 'pendingSubjectCodes', label: 'Pending Course Codes' }
-        ];
-
-        const rows = json.rows || [];
-
-        if (!downloadCsv(rows, 'Mentor_Submission_Status.csv', headers)) {
-          setDownloadMessage('No submission records found.');
-        } else {
-          setDownloadMessage(
-            `Downloaded ${number(rows.length)} learner records.`
-          );
-        }
-      } else {
-        const blob = await response.blob();
-
-        if (!blob.size) {
-          setDownloadMessage('No submission records found.');
-          return;
-        }
-
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-
-        link.href = url;
-        link.download = 'Mentor_Submission_Status.csv';
-
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-
-        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-
-        setDownloadMessage('Submission Status downloaded successfully.');
-      }
-    } catch (err) {
-      setDownloadError(
-        err.name === 'AbortError'
-          ? 'Download timed out. Please try again.'
-          : err.message || 'Unable to download submission data.'
-      );
-    } finally {
-      window.clearTimeout(timeoutId);
-      setDownloading('');
-    }
-  }
-
-  function downloadMentorProgramSummary() {
-    const rows = data?.mentorProgramSummary || [];
-
-    const headers = [
-      { key: 'mentor', label: 'Mentor' },
-      { key: 'program', label: 'Program' },
-      { key: 'totalLearners', label: 'Total Learners' },
-      { key: 'fullySubmitted', label: 'Full' },
-      { key: 'partiallySubmitted', label: 'Partial' },
-      { key: 'notSubmitted', label: 'Nil' }
-    ];
-
-    const exportRows = rows.map(row => ({
-      mentor: getValue(row, 'mentor', 'name'),
-      program: getValue(row, 'program'),
-      totalLearners: getValue(row, 'totalLearners'),
-      fullySubmitted: getValue(row, 'fullySubmitted', 'full'),
-      partiallySubmitted: getValue(row, 'partiallySubmitted', 'partial'),
-      notSubmitted: getValue(row, 'notSubmitted', 'nil')
-    }));
-
-    if (!downloadCsv(
-      exportRows,
-      'Mentor_Wise_Program_Summary.csv',
-      headers
-    )) {
-      setDownloadMessage('No mentor program summary data available.');
-      return;
-    }
-
-    setDownloadMessage('Mentor-wise Program Summary downloaded.');
-  }
-
-  function downloadMentorSalesSummary() {
-    const rows = data?.mentorSalesSummary || [];
-
-    const headers = [
-      { key: 'mentor', label: 'Mentor' },
-      { key: 'salesType', label: 'Sales Type' },
-      { key: 'totalLearners', label: 'Total Learners' },
-      { key: 'fullySubmitted', label: 'Full' },
-      { key: 'partiallySubmitted', label: 'Partial' },
-      { key: 'notSubmitted', label: 'Nil' }
-    ];
-
-    const exportRows = rows.map(row => ({
-      mentor: getValue(row, 'mentor', 'name'),
-      salesType: getValue(row, 'salesType'),
-      totalLearners: getValue(row, 'totalLearners'),
-      fullySubmitted: getValue(row, 'fullySubmitted', 'full'),
-      partiallySubmitted: getValue(row, 'partiallySubmitted', 'partial'),
-      notSubmitted: getValue(row, 'notSubmitted', 'nil')
-    }));
-
-    if (!downloadCsv(
-      exportRows,
-      'Mentor_Wise_Sales_Type_Summary.csv',
-      headers
-    )) {
-      setDownloadMessage('No mentor sales summary data available.');
-      return;
-    }
-
-    setDownloadMessage('Mentor-wise Sales Type Summary downloaded.');
-  }
-
-  function downloadMentorSummary() {
-    const rows = data?.mentorSummary || [];
-
-    const headers = [
-      { key: 'mentor', label: 'Mentor' },
-      { key: 'totalLearners', label: 'Total Learners' },
-      { key: 'fullySubmitted', label: 'Full' },
-      { key: 'partiallySubmitted', label: 'Partial' },
-      { key: 'notSubmitted', label: 'Nil' }
-    ];
-
-    const exportRows = rows.map(row => ({
-      mentor: getValue(row, 'mentor', 'name'),
-      totalLearners: getValue(row, 'totalLearners'),
-      fullySubmitted: getValue(row, 'fullySubmitted', 'full'),
-      partiallySubmitted: getValue(row, 'partiallySubmitted', 'partial'),
-      notSubmitted: getValue(row, 'notSubmitted', 'nil')
-    }));
-
-    if (!downloadCsv(
-      exportRows,
-      'Mentor_Wise_Summary.csv',
-      headers
-    )) {
-      setDownloadMessage('No mentor summary data available.');
-      return;
-    }
-
-    setDownloadMessage('Mentor-wise Summary downloaded.');
-  }
-
-  const tiles = [
-    {
-      id: 'submission',
-      title: 'Submission Status',
-      description:
-        'Download learner-level submission data, including Full, Partial and Nil status.',
-      action: downloadSubmissionStatus,
-      accent: '#2563eb'
-    },
-    {
-      id: 'program',
-      title: 'Mentor-wise Program Summary',
-      description:
-        'Download mentor-wise program allocation and Full, Partial and Nil submission counts.',
-      action: downloadMentorProgramSummary,
-      accent: '#16a34a'
-    },
-    {
-      id: 'sales',
-      title: 'Mentor-wise Sales Type Summary',
-      description:
-        'Download Inside and Channel learner counts with submission status for each mentor.',
-      action: downloadMentorSalesSummary,
-      accent: '#d97706'
-    },
-    {
-      id: 'mentor',
-      title: 'Mentor-wise Summary',
-      description:
-        'Download the overall learner and submission performance of every mentor.',
-      action: downloadMentorSummary,
-      accent: '#7c3aed'
-    }
-  ];
 
   return (
     <main style={styles.page}>
@@ -569,6 +583,7 @@ export default function MentorDashboard() {
         {error && (
           <div style={styles.error}>
             <strong>Unable to load dashboard:</strong> {error}
+
             <div style={{ marginTop: 9 }}>
               <button
                 style={styles.button}
@@ -663,7 +678,7 @@ export default function MentorDashboard() {
 
         {/* KPI CARDS */}
         <section style={styles.grid}>
-          {submissionKpis.map(item => (
+          {kpiCards.map(item => (
             <div
               key={item.label}
               style={{
@@ -673,11 +688,7 @@ export default function MentorDashboard() {
             >
               <div style={styles.kpiLabel}>{item.label}</div>
               <div style={styles.kpiValue}>
-                {loading
-                  ? '—'
-                  : item.formatted
-                    ? item.value
-                    : number(item.value)}
+                {loading ? '—' : item.value}
               </div>
             </div>
           ))}
@@ -686,14 +697,6 @@ export default function MentorDashboard() {
         {downloadError && (
           <div style={styles.error}>
             <strong>Download failed:</strong> {downloadError}
-            <div style={{ marginTop: 8 }}>
-              <button
-                style={styles.button}
-                onClick={() => setDownloadError('')}
-              >
-                Dismiss
-              </button>
-            </div>
           </div>
         )}
 
@@ -701,52 +704,45 @@ export default function MentorDashboard() {
           <div style={styles.success}>{downloadMessage}</div>
         )}
 
-        {/* FOUR MENTOR DASHBOARD TILES */}
-        <section style={styles.panel}>
-          <h2 style={styles.sectionTitle}>Mentor Reports</h2>
+        {/* TABLE 1 */}
+        <TableSection
+          title="Submission Status"
+          rows={submissionStatusRows}
+          columns={submissionStatusColumns}
+          filename="Submission_Status.csv"
+          onDownload={downloadTable}
+          loading={loading}
+        />
 
-          <p style={styles.muted}>
-            Select a report to download the data based on the filters above.
-          </p>
+        {/* TABLE 2 */}
+        <TableSection
+          title="Mentor-wise Program Summary"
+          rows={mentorProgramRows}
+          columns={mentorProgramColumns}
+          filename="Mentor_Wise_Program_Summary.csv"
+          onDownload={downloadTable}
+          loading={loading}
+        />
 
-          <div style={styles.tileGrid}>
-            {tiles.map(tile => (
-              <button
-                key={tile.id}
-                type="button"
-                style={{
-                  ...styles.tile,
-                  borderTop: `4px solid ${tile.accent}`,
-                  opacity: loading || Boolean(downloading) ? 0.6 : 1,
-                  cursor: loading || downloading ? 'not-allowed' : 'pointer'
-                }}
-                disabled={loading || Boolean(downloading)}
-                onClick={() => {
-                  setDownloadMessage('');
-                  setDownloadError('');
+        {/* TABLE 3 */}
+        <TableSection
+          title="Mentor-wise Sales Type Summary"
+          rows={mentorSalesRows}
+          columns={mentorSalesColumns}
+          filename="Mentor_Wise_Sales_Type_Summary.csv"
+          onDownload={downloadTable}
+          loading={loading}
+        />
 
-                  if (tile.id === 'submission') {
-                    tile.action();
-                  } else {
-                    tile.action();
-                  }
-                }}
-              >
-                <div style={styles.tileTitle}>{tile.title}</div>
-
-                <div style={styles.tileDescription}>
-                  {tile.description}
-                </div>
-
-                <div style={styles.tileAction}>
-                  {downloading === tile.id
-                    ? 'Preparing download…'
-                    : '↓ Download CSV'}
-                </div>
-              </button>
-            ))}
-          </div>
-        </section>
+        {/* TABLE 4 */}
+        <TableSection
+          title="Mentor-wise Summary"
+          rows={mentorSummaryRows}
+          columns={mentorSummaryColumns}
+          filename="Mentor_Wise_Summary.csv"
+          onDownload={downloadTable}
+          loading={loading}
+        />
 
         <footer
           style={{
